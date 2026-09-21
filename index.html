@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<title>Mi Rutina</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f4f6;color:#111827}
+header{background:#111827;color:white;padding:18px 16px;position:sticky;top:0;z-index:5}
+h1,h2,h3,p{margin:0 0 10px}.sub{opacity:.75;font-size:13px}.wrap{max-width:760px;margin:auto;padding:14px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs button,.btn{border:0;border-radius:10px;padding:11px 14px;font-weight:700;background:#e5e7eb;color:#111827}
+.tabs button.active,.btn.primary{background:#111827;color:white}.card{background:white;border-radius:14px;padding:15px;margin:10px 0;box-shadow:0 1px 4px #00000012}
+.exercise{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:10px 0}.exhead{display:flex;justify-content:space-between;gap:8px}.tag{font-size:12px;color:#6b7280}
+.rows{display:grid;grid-template-columns:40px 1fr 1fr 42px;gap:7px;align-items:center;margin-top:8px}.rows input{width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;font-size:16px}.rows button{border:0;border-radius:8px;padding:9px;background:#fee2e2}
+.small{font-size:12px;color:#6b7280}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;background:white}
+select,input[type=date]{padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:15px}
+.history-item{padding:12px 0;border-bottom:1px solid #eee}.muted{color:#6b7280}
+.hidden{display:none}.danger{background:#fee2e2!important;color:#991b1b!important}
+</style>
+</head>
+<body>
+<header><div class="wrap"><h1>💪 Mi Rutina</h1><div class="sub" id="today"></div></div></header>
+<main class="wrap">
+<div class="tabs">
+<button class="active" data-tab="train">Entrenar</button>
+<button data-tab="history">Historial</button>
+<button data-tab="stats">Estadísticas</button>
+</div>
+
+<section id="train">
+<div class="card">
+<h2>Sesión de hoy</h2>
+<div class="small">La fecha se pone automáticamente y puedes entrenar cualquier día.</div>
+<div class="actions">
+<button class="btn primary" onclick="startSession('A')">🟢 Empuje + Cuádriceps</button>
+<button class="btn primary" onclick="startSession('B')">🔵 Tirón + Posterior + Abs</button>
+</div>
+</div>
+<div id="session"></div>
+</section>
+
+<section id="history" class="hidden">
+<div class="card"><h2>Historial</h2><div id="historyList"></div></div>
+</section>
+
+<section id="stats" class="hidden">
+<div class="card">
+<h2>Progresión</h2>
+<select id="statExercise" onchange="drawChart()"></select>
+<canvas id="chart" width="700" height="240"></canvas>
+<div id="best" class="small" style="margin-top:10px"></div>
+</div>
+</section>
+</main>
+
+<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});
+const KEY='miRutinaDataV1';
+const routines={
+ A:[
+  ['Pino asistido','4 × 2-4'],['Sentadilla a una pierna','3-4 × 5-8'],
+  ['Pike Push Ups con piernas elevadas','3 × 6-10'],['Fondos en paralelas +20 kg','4 × 5-8'],
+  ['Flexiones en paralelas','3 × 8-15'],['Elevaciones laterales','3 × 12-20']
+ ],
+ B:[
+  ['Dominadas pronas/neutras','4 × 5-8'],['Peso muerto rumano','3 × 8-12'],
+  ['Dominadas supinas','3 × 6-10'],['Australian Pull-ups','2-3 × 10-15'],
+  ['Gemelos a una pierna','3 × 15-20'],['Face Pulls','2-3 × 12-20'],
+  ['Ejercicio específico de bíceps','2-3 × 10-15'],['Abdomen','3 series']
+ ]
+};
+let data=JSON.parse(localStorage.getItem(KEY)||'[]'), current=null;
+const isoToday=()=>new Date().toISOString().slice(0,10);
+const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+document.getElementById('today').textContent=fmt(isoToday());
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+ document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));
+ document.getElementById(b.dataset.tab).classList.remove('hidden');
+ if(b.dataset.tab==='history')renderHistory();
+ if(b.dataset.tab==='stats')setupStats();
+});
+
+
+function previousForExercise(name){
+ const old=data.slice().reverse().find(s=>s.exercises.some(e=>e.name===name));
+ return old ? old.exercises.find(e=>e.name===name) : null;
+}
+
+function startSession(type){
+ current={id:Date.now(),date:isoToday(),type,exercises:routines[type].map(x=>({name:x[0],target:x[1],sets:[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]}))};
+ renderSession();
+}
+function renderSession(){
+ const s=document.getElementById('session');
+ s.innerHTML=`<div class="card"><h2>${current.type==='A'?'🟢 Empuje + Cuádriceps':'🔵 Tirón + Posterior + Abs'}</h2>
+ <div class="small">${fmt(current.date)}</div>
+ ${current.exercises.map((e,i)=>{
+   const prev=previousForExercise(e.name);
+   const prevText=prev ? prev.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+' kg × ':'')+x.reps).join(' · ') : '';
+   return `<div class="exercise">
+   <div class="exhead"><strong>${i+1}. ${e.name}</strong><span class="tag">${e.target}</span></div>
+   ${prevText?`<div class="small" style="margin-top:6px">Última vez: <strong>${prevText}</strong></div>`:'<div class="small" style="margin-top:6px">Primera vez registrada</div>'}
+   <div class="rows">${e.sets.map((set,j)=>`<span>${j+1}</span>
+   <input placeholder="kg" inputmode="decimal" value="${set.weight}" oninput="current.exercises[${i}].sets[${j}].weight=this.value">
+   <input placeholder="reps" inputmode="numeric" value="${set.reps}" oninput="current.exercises[${i}].sets[${j}].reps=this.value">
+   <button onclick="removeSet(${i},${j})">×</button>`).join('')}</div>
+   <button class="btn" style="margin-top:8px" onclick="addSet(${i})">+ Serie</button>
+   ${prevText?`<button class="btn" style="margin-top:8px;margin-left:5px" onclick="copyPrevious(${i})">↩ Copiar última</button>`:''}
+   </div>`;
+ }).join('')}
+ <div class="actions"><button class="btn primary" onclick="saveSession()">💾 Guardar sesión</button><button class="btn" onclick="current=null;document.getElementById('session').innerHTML=''">Cancelar</button></div></div>`;
+}
+function copyPrevious(i){
+ const prev=previousForExercise(current.exercises[i].name);
+ if(!prev)return;
+ current.exercises[i].sets=prev.sets.map(x=>({weight:x.weight||'',reps:x.reps||''}));
+ renderSession();
+}
+function addSet(i){current.exercises[i].sets.push({weight:'',reps:''});renderSession()}
+function removeSet(i,j){if(current.exercises[i].sets.length>1)current.exercises[i].sets.splice(j,1);renderSession()}
+function saveSession(){
+ data.push(current);localStorage.setItem(KEY,JSON.stringify(data)); current=null;
+ document.getElementById('session').innerHTML=`<div class="card"><h3>✅ Sesión guardada</h3><div class="small">Queda registrada con la fecha de hoy.</div></div>`;
+}
+function renderHistory(){
+ const el=document.getElementById('historyList');
+ if(!data.length){el.innerHTML='<p class="muted">Todavía no hay sesiones guardadas.</p>';return}
+ el.innerHTML=data.slice().reverse().map(s=>`<div class="history-item"><strong>${fmt(s.date)} — ${s.type==='A'?'Empuje + Cuádriceps':'Tirón + Posterior + Abs'}</strong>
+ <div class="small">${s.exercises.map(e=>{let r=e.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+'kg × ':'')+x.reps).join(', ');return r?e.name+': '+r:''}).filter(Boolean).join(' · ')}</div></div>`).join('');
+}
+function setupStats(){
+ const names=[...new Set(data.flatMap(s=>s.exercises.map(e=>e.name)))];
+ const sel=document.getElementById('statExercise'); const old=sel.value;
+ sel.innerHTML=names.map(n=>`<option>${n}</option>`).join(''); if(old&&names.includes(old))sel.value=old;
+ drawChart();
+}
+function drawChart(){
+ const canvas=document.getElementById('chart'),ctx=canvas.getContext('2d'),sel=document.getElementById('statExercise');
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ if(!sel.value){document.getElementById('best').textContent='Guarda alguna sesión para ver estadísticas.';return}
+ const pts=[];
+ data.forEach(s=>{const e=s.exercises.find(x=>x.name===sel.value);if(!e)return; const vals=e.sets.map(x=>parseFloat(x.reps)).filter(Number.isFinite); if(vals.length)pts.push({date:s.date,v:Math.max(...vals)})});
+ if(!pts.length){document.getElementById('best').textContent='Aún no hay repeticiones registradas para este ejercicio.';return}
+ const max=Math.max(...pts.map(p=>p.v)), min=Math.min(...pts.map(p=>p.v)), pad=35,w=canvas.width-pad*2,h=canvas.height-pad*2;
+ ctx.strokeStyle='#d1d5db';ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,pad+h);ctx.lineTo(pad+w,pad+h);ctx.stroke();
+ ctx.beginPath();pts.forEach((p,i)=>{const x=pad+(i/(Math.max(1,pts.length-1)))*w,y=pad+h-((p.v-min)/(Math.max(1,max-min)))*h;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y)});ctx.stroke();
+ pts.forEach((p,i)=>{const x=pad+(i/(Math.max(1,pts.length-1)))*w,y=pad+h-((p.v-min)/(Math.max(1,max-min)))*h;ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();});
+ document.getElementById('best').textContent=`Mejor registro de repeticiones en una serie: ${max}. Sesiones registradas: ${pts.length}.`;
+}
+</script>
+</body>
+</html>
