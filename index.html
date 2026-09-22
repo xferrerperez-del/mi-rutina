@@ -42,6 +42,17 @@ canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;backg
 .summary{background:#eef2ff;border-radius:12px;padding:12px;margin-top:10px}.mini{font-size:13px}
 @media(max-width:430px){.grid2{grid-template-columns:1fr}.manage{grid-template-columns:1fr 90px}.tabs button{white-space:nowrap}.timer-ring{width:170px;height:170px}.timer-ring:after{width:132px;height:132px}.timer{font-size:54px}}
 </style>
+
+<style id="v6theme">
+:root{--bg:#eef1f4;--card:#fff;--ink:#18232d;--muted:#687682;--navy:#293b4a;--slate:#506474;--steel:#748592;--line:#d7dee4;--soft:#e8edf1}
+body{background:linear-gradient(180deg,#e7ebef 0,#f4f6f7 260px,#eef1f4 100%)!important;color:var(--ink)!important}
+header{background:linear-gradient(135deg,#1f2d39,#344957)!important;box-shadow:0 4px 18px #18232d25!important}
+.card{background:rgba(255,255,255,.98)!important;border:1px solid var(--line)!important;box-shadow:0 3px 14px #18232d12!important}
+h1,h2,h3{color:var(--navy)!important}.tabs{background:#dce2e7!important;padding:5px!important;border-radius:13px!important}.tabs button{background:transparent!important;color:#435461!important;border-radius:9px!important}.tabs button.active{background:var(--navy)!important;color:#fff!important}
+.btn{background:#e2e7eb!important;color:#293b4a!important;border:1px solid #cdd5dc!important}.btn.primary{background:var(--navy)!important;color:#fff!important;border-color:var(--navy)!important}.btn.danger{background:#eee7e5!important;color:#744f48!important}
+.exercise{background:#f7f8f9!important;border:1px solid #d9dfe4!important;border-left:4px solid var(--slate)!important}.tag{background:#e2e7eb!important;color:#435461!important}.summary{background:#e8edf0!important;border:1px solid #d5dce1!important}.history-item{background:#f7f8f9!important;border-left:4px solid var(--steel)!important}
+input,select{background:#fff!important;border:1px solid #cbd3da!important;color:#18232d!important}.small{color:var(--muted)!important}.pill{background:#e4e9ed!important;color:#435461!important}
+</style>
 </head>
 <body>
 <header><div class="wrap"><div style="display:flex;align-items:center;gap:12px"><img src="logo-192.png" alt="Mi Rutina" style="width:54px;height:54px;border-radius:14px;object-fit:cover"><div><h1>Mi Rutina</h1><div class="sub" id="today"></div></div></div></header>
@@ -102,7 +113,7 @@ canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;backg
 <button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo</button>
 </div>
 <input id="fileInput" type="file" accept="application/json" hidden onchange="importData(event)">
-<p id="dataInfo" class="small" style="margin-top:12px"></p><p class="small">Mi Rutina v5 · Peso opcional · Circuitos · Temporizador avanzado · Historial y progreso.</p>
+<p id="dataInfo" class="small" style="margin-top:12px"></p><p class="small">Mi Rutina v6 · Peso opcional · Circuitos · Temporizador avanzado · Historial y progreso.</p>
 </div>
 </section>
 </main>
@@ -251,7 +262,7 @@ function renderSession(){
       <div class="exhead"><strong>${i+1}. ${escapeHtml(e.name)}</strong><span class="tag">${escapeHtml(e.target)} · ${e.mode==='circuit'?'🔄 Circuito':'⏱️ '+(e.rest||90)+' s'}</span></div>
       ${e.note?`<div class="small" style="margin-top:6px">📝 ${escapeHtml(e.note)}</div>`:''}
       ${prevText?`<div class="small" style="margin-top:6px">Última vez: <strong>${escapeHtml(prevText)}</strong></div>`:'<div class="small" style="margin-top:6px">Primera vez registrada</div>'}
-      <div class="rows"><span></span><span class="small">${current.useWeight?'kg':''}</span><span class="small">reps</span><span></span>
+      <div class="rows"><span class="small">Serie</span><span class="small">${current.useWeight?'kg':''}</span><span class="small"><b>REPS</b></span><span></span>
       ${e.sets.map((set,j)=>`<span>${j+1}</span>
       ${current.useWeight?`<div class="stepper"><button onclick="stepValue(${i},${j},'weight',-0.5)">−</button><input inputmode="decimal" placeholder="kg" value="${escapeAttr(set.weight)}" oninput="current.exercises[${i}].sets[${j}].weight=this.value"><button onclick="stepValue(${i},${j},'weight',0.5)">+</button></div>`:'<span></span>'}
       <div class="stepper"><button onclick="stepValue(${i},${j},'reps',-1)">−</button><input inputmode="numeric" placeholder="reps" value="${escapeAttr(set.reps)}" oninput="current.exercises[${i}].sets[${j}].reps=this.value"><button onclick="stepValue(${i},${j},'reps',1)">+</button></div>
