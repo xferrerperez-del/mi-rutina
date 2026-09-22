@@ -447,7 +447,7 @@ function tickTimer(){
   if(!timerState.paused)timerState.left--;
 }
 function adjustTimer(delta){timerState.left=Math.max(0,timerState.left+delta);timerState.total=Math.max(timerState.total,timerState.left);tickTimer();}
-function pauseTimer(){timerState.paused=!timerState.paused;event?.target?.textContent=timerState.paused?'Continuar':'Pausar';}
+function pauseTimer(){timerState.paused=!timerState.paused;document.querySelector('#timerBox .actions .btn:nth-child(2)').textContent=timerState.paused?'Continuar':'Pausar';}
 function stopTimer(){clearInterval(timer);document.getElementById('timerBox')?.remove();}
 
 function exportData(){
