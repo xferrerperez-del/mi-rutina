@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#111827">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-192.png">
+<link rel="apple-touch-icon" href="logo-192.png">
 <title>Mi Rutina</title>
 <style>
 *{box-sizing:border-box}
@@ -39,7 +41,7 @@ canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;backg
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1>💪 Mi Rutina</h1><div class="sub" id="today"></div></div></header>
+<header><div class="wrap"><div style="display:flex;align-items:center;gap:12px"><img src="logo-192.png" alt="Mi Rutina" style="width:54px;height:54px;border-radius:14px;object-fit:cover"><div><h1>Mi Rutina</h1><div class="sub" id="today"></div></div></div></header>
 <main class="wrap">
 <div class="tabs">
 <button class="active" data-tab="train">Entrenar</button>
@@ -57,10 +59,7 @@ canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;backg
 <label class="small">Fecha<input type="date" id="sessionDate"></label>
 <label class="small">Descanso<select id="restSelect"><option value="60">60 s</option><option value="90" selected>90 s</option><option value="120">120 s</option><option value="180">180 s</option></select></label>
 </div>
-<div class="actions">
-<button class="btn primary" onclick="startSession('A')">🟢 Empuje + Cuádriceps</button>
-<button class="btn primary" onclick="startSession('B')">🔵 Tirón + Posterior + Abs</button>
-</div>
+<div id="routineButtons" class="actions"></div>
 </div>
 <div id="session"></div>
 </section>
@@ -69,11 +68,7 @@ canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;backg
 <div class="card">
 <h2>⚙️ Mis ejercicios</h2>
 <p class="small">Aquí puedes añadir, cambiar el nombre, modificar las series/repeticiones objetivo o borrar cualquier ejercicio. Los cambios se guardan en este dispositivo.</p>
-<div class="actions">
-<button class="btn primary" onclick="addExercise('A')">➕ Añadir a Empuje</button>
-<button class="btn primary" onclick="addExercise('B')">➕ Añadir a Tirón</button>
-<button class="btn" onclick="restoreDefaults()">↩ Restaurar ejercicios originales</button>
-</div>
+<div class="actions"><button class="btn" onclick="restoreDefaults()">↩ Restaurar Empuje/Tirón</button><button class="btn primary" onclick="addRoutine()">➕ Nueva rutina</button></div>
 <div id="routineManager"></div>
 </div>
 </section>
@@ -133,32 +128,28 @@ const defaultRoutines={
  ]
 };
 
-function cloneDefaults(){
- return JSON.parse(JSON.stringify(defaultRoutines));
+function cloneDefaults(){ return JSON.parse(JSON.stringify(defaultRoutines)); }
+
+function migrateRoutines(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(ROUTINE_KEY)||'null');
+  if(Array.isArray(saved) && saved.length) return saved;
+  if(saved && saved.A && saved.B) return [
+   {id:'A',name:'Empuje + Cuádriceps',exercises:saved.A},
+   {id:'B',name:'Tirón + Posterior + Abs',exercises:saved.B}
+  ];
+ }catch(e){}
+ return [
+  {id:'A',name:'Empuje + Cuádriceps',exercises:defaultRoutines.A},
+  {id:'B',name:'Tirón + Posterior + Abs',exercises:defaultRoutines.B}
+ ];
 }
 
-let routines=loadRoutines();
+let routines=migrateRoutines();
 let data=loadData();
 let current=null;
 let timer=null;
-
-function loadData(){
- try{
-  const old=JSON.parse(localStorage.getItem(KEY)||'[]');
-  return Array.isArray(old)?old:[];
- }catch(e){return []}
-}
-
-function loadRoutines(){
- try{
-  const saved=JSON.parse(localStorage.getItem(ROUTINE_KEY)||'null');
-  if(saved && saved.A && saved.B) return saved;
- }catch(e){}
- const d=cloneDefaults();
- localStorage.setItem(ROUTINE_KEY,JSON.stringify(d));
- return d;
-}
-
+function loadData(){try{const old=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(old)?old:[]}catch(e){return []}}
 function persistData(){localStorage.setItem(KEY,JSON.stringify(data))}
 function persistRoutines(){localStorage.setItem(ROUTINE_KEY,JSON.stringify(routines))}
 
@@ -172,6 +163,7 @@ function fmt(d){
 
 document.getElementById('today').textContent=fmt(isoToday());
 document.getElementById('sessionDate').value=isoToday();
+renderRoutineButtons();
 
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
@@ -193,23 +185,15 @@ function previousForExercise(name){
  return null;
 }
 
-function startSession(type){
- current={
-  id:Date.now(),
-  date:document.getElementById('sessionDate').value||isoToday(),
-  type,
-  exercises:routines[type].map(x=>({
-   name:x[0],
-   target:x[1],
-   sets:[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]
-  }))
- };
+function startSession(id){
+ const r=routines.find(x=>x.id===id); if(!r)return;
+ current={id:Date.now(),date:document.getElementById('sessionDate').value||isoToday(),type:id,routineName:r.name,exercises:r.exercises.map(x=>({name:x[0],target:x[1],sets:[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]}))};
  renderSession();
 }
 
 function renderSession(){
  const s=document.getElementById('session');
- s.innerHTML=`<div class="card"><h2>${current.type==='A'?'🟢 Empuje + Cuádriceps':'🔵 Tirón + Posterior + Abs'}</h2>
+ s.innerHTML=`<div class="card"><h2>${escapeHtml(current.routineName)}</h2>
  <div class="small">${fmt(current.date)}</div>
  ${current.exercises.map((e,i)=>{
    const prev=previousForExercise(e.name);
@@ -260,63 +244,27 @@ function saveSession(){
  document.getElementById('session').innerHTML='<div class="card"><h3>✅ Sesión guardada</h3><div class="small">Registrada correctamente.</div></div>';
 }
 
+function renderRoutineButtons(){
+ const el=document.getElementById('routineButtons');
+ el.innerHTML=routines.map(r=>`<button class="btn primary" onclick="startSession('${r.id}')">▶️ ${escapeHtml(r.name)}</button>`).join('');
+}
 function renderRoutineManager(){
  const el=document.getElementById('routineManager');
- el.innerHTML=['A','B'].map(type=>{
-  const title=type==='A'?'🟢 Empuje + Cuádriceps':'🔵 Tirón + Posterior + Abs';
-  return `<div class="card"><h3>${title}</h3>
-  ${routines[type].map((x,i)=>`<div class="exercise">
-   <div class="small">Ejercicio ${i+1}</div>
-   <div class="manage">
-    <input type="text" value="${escapeAttr(x[0])}" aria-label="Nombre del ejercicio" onchange="renameExercise('${type}',${i},this.value)">
-    <input type="text" value="${escapeAttr(x[1])}" aria-label="Series y repeticiones objetivo" onchange="changeTarget('${type}',${i},this.value)" placeholder="4 × 6-8">
-   </div>
-   <div class="actions">
-    <button class="btn danger" onclick="deleteExercise('${type}',${i})">🗑️ Borrar ejercicio</button>
-   </div>
-  </div>`).join('')}
-  </div>`;
- }).join('');
+ el.innerHTML=routines.map(r=>`<div class="card">
+  <div class="manage"><input type="text" value="${escapeAttr(r.name)}" onchange="renameRoutine('${r.id}',this.value)"><button class="btn danger" onclick="deleteRoutine('${r.id}')">🗑️ Rutina</button></div>
+  <div class="actions"><button class="btn primary" onclick="addExerciseToRoutine('${r.id}')">➕ Añadir ejercicio</button></div>
+  ${r.exercises.map((x,i)=>`<div class="exercise"><div class="small">Ejercicio ${i+1}</div><div class="manage"><input type="text" value="${escapeAttr(x[0])}" onchange="renameExercise('${r.id}',${i},this.value)"><input type="text" value="${escapeAttr(x[1])}" onchange="changeTarget('${r.id}',${i},this.value)" placeholder="4 × 6-8"></div><div class="actions"><button class="btn danger" onclick="deleteExercise('${r.id}',${i})">🗑️ Borrar ejercicio</button></div></div>`).join('')}
+ </div>`).join('')+`<div class="card"><button class="btn primary" onclick="addRoutine()">➕ Crear nueva rutina</button></div>`;
 }
-
-function renameExercise(type,index,value){
- value=value.trim();
- if(!value){alert('El nombre no puede quedar vacío.');renderRoutineManager();return}
- routines[type][index][0]=value;
- persistRoutines();
- renderRoutineManager();
-}
-
-function changeTarget(type,index,value){
- value=value.trim()||'';
- routines[type][index][1]=value;
- persistRoutines();
- renderRoutineManager();
-}
-
-function deleteExercise(type,index){
- const name=routines[type][index][0];
- if(!confirm('¿Borrar "'+name+'"? Esto lo quitará de las próximas sesiones, pero no borrará sesiones antiguas del historial.'))return;
- routines[type].splice(index,1);
- persistRoutines();
- renderRoutineManager();
-}
-
-function addExercise(type){
- const name=prompt('Nombre del nuevo ejercicio:');
- if(!name||!name.trim())return;
- const target=prompt('Series y repeticiones objetivo (por ejemplo 3 × 8-12):','3 × 8-12');
- routines[type].push([name.trim(),(target||'').trim()]);
- persistRoutines();
- renderRoutineManager();
-}
-
-function restoreDefaults(){
- if(!confirm('¿Restaurar los ejercicios originales? Tus sesiones del historial NO se borrarán.'))return;
- routines=cloneDefaults();
- persistRoutines();
- renderRoutineManager();
-}
+function findRoutine(id){return routines.find(r=>r.id===id)}
+function renameRoutine(id,value){const r=findRoutine(id); value=value.trim(); if(!r||!value)return renderRoutineManager(); r.name=value; persistRoutines(); renderRoutineManager(); renderRoutineButtons()}
+function deleteRoutine(id){if(routines.length<=1){alert('Debe quedar al menos una rutina.');return} const r=findRoutine(id); if(!r)return; if(!confirm('¿Borrar la rutina "'+r.name+'"? No se borrará el historial.'))return; routines=routines.filter(x=>x.id!==id); persistRoutines(); renderRoutineManager(); renderRoutineButtons()}
+function addRoutine(){const name=prompt('Nombre de la nueva rutina:'); if(!name||!name.trim())return; const id='R'+Date.now(); routines.push({id,name:name.trim(),exercises:[]}); persistRoutines(); renderRoutineManager(); renderRoutineButtons()}
+function addExerciseToRoutine(id){const r=findRoutine(id); if(!r)return; const name=prompt('Nombre del nuevo ejercicio:'); if(!name||!name.trim())return; const target=prompt('Series y repeticiones objetivo:','3 × 8-12'); r.exercises.push([name.trim(),(target||'').trim()]); persistRoutines(); renderRoutineManager()}
+function renameExercise(id,index,value){const r=findRoutine(id); value=value.trim(); if(!r||!value){renderRoutineManager();return} r.exercises[index][0]=value; persistRoutines(); renderRoutineManager()}
+function changeTarget(id,index,value){const r=findRoutine(id); if(!r)return; r.exercises[index][1]=value.trim(); persistRoutines(); renderRoutineManager()}
+function deleteExercise(id,index){const r=findRoutine(id); if(!r)return; const name=r.exercises[index][0]; if(!confirm('¿Borrar "'+name+'"? No se borrará de sesiones antiguas.'))return; r.exercises.splice(index,1); persistRoutines(); renderRoutineManager()}
+function restoreDefaults(){if(!confirm('¿Restaurar Empuje y Tirón originales? Las nuevas rutinas no se borrarán.'))return; const a=findRoutine('A'),b=findRoutine('B'); if(a)a.exercises=cloneDefaults().A;if(b)b.exercises=cloneDefaults().B; persistRoutines();renderRoutineManager();renderRoutineButtons()}
 
 function deleteSession(id){
  if(!confirm('¿Borrar esta sesión?'))return;
@@ -345,7 +293,7 @@ function renderHistory(){
  el.innerHTML='<div class="actions"><button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo</button></div>'+
  data.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(s=>
  `<div class="history-item"><div class="history-head"><div>
- <strong>${fmt(s.date)} — ${s.type==='A'?'Empuje + Cuádriceps':'Tirón + Posterior + Abs'}</strong>
+ <strong>${fmt(s.date)} — ${escapeHtml(s.routineName || (findRoutine(s.type)?.name || s.type))}</strong>
  <div>${s.exercises.map(e=>{
    const r=e.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+'kg × ':'')+x.reps).join(', ');
    return r?`<span class="pill">${escapeHtml(e.name)}: ${escapeHtml(r)}</span>`:'';
@@ -451,7 +399,7 @@ function importData(e){
    if(!Array.isArray(x.data))throw Error();
    if(!confirm('¿Reemplazar el historial y los ejercicios actuales por la copia?'))return;
    data=x.data;
-   if(x.routines&&x.routines.A&&x.routines.B)routines=x.routines;
+   if(Array.isArray(x.routines)&&x.routines.length)routines=x.routines; else if(x.routines&&x.routines.A&&x.routines.B)routines=[{id:'A',name:'Empuje + Cuádriceps',exercises:x.routines.A},{id:'B',name:'Tirón + Posterior + Abs',exercises:x.routines.B}];
    persistData();persistRoutines();
    updateInfo();
    alert('Copia restaurada correctamente.');
@@ -464,7 +412,7 @@ function importData(e){
 }
 
 function updateInfo(){
- document.getElementById('dataInfo').textContent=`${data.length} sesión(es) guardada(s) y ${routines.A.length+routines.B.length} ejercicios configurados en este dispositivo.`;
+ document.getElementById('dataInfo').textContent=`${data.length} sesión(es) guardada(s) y ${routines.reduce((n,r)=>n+r.exercises.length,0)} ejercicios configurados en este dispositivo.`;
 }
 
 function escapeHtml(v){
