@@ -10,13 +10,13 @@
 <title>Mi Rutina</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f4f6;color:#111827}
-header{background:#111827;color:#fff;padding:16px;position:sticky;top:0;z-index:10}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(180deg,#eef2ff 0,#f8fafc 220px,#f3f4f6 100%);color:#111827}
+header{background:linear-gradient(135deg,#111827,#1f2937);color:#fff;padding:16px;position:sticky;top:0;z-index:10;box-shadow:0 4px 16px #0002}
 .wrap{max-width:760px;margin:auto;padding:12px}
 h1,h2,h3,p{margin:0 0 9px}.sub,.small{font-size:12px;color:#6b7280}.sub{color:#d1d5db}
 .tabs{display:flex;gap:6px;overflow:auto;margin-bottom:12px}
-.tabs button,.btn{border:0;border-radius:10px;padding:10px 13px;font-weight:700;background:#e5e7eb;color:#111827}
-.tabs button.active,.btn.primary{background:#111827;color:#fff}
+ .tabs button,.btn{border:0;border-radius:12px;padding:10px 13px;font-weight:700;background:#e5e7eb;color:#111827;transition:.15s transform,.15s opacity}.btn:active,.tabs button:active{transform:scale(.97)}
+ .tabs button.active,.btn.primary{background:#111827;color:#fff;box-shadow:0 3px 10px #11182722}
 .btn.danger{background:#fee2e2!important;color:#991b1b!important}
 .card{background:#fff;border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 1px 5px #0001}
 .actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
@@ -33,14 +33,14 @@ h1,h2,h3,p{margin:0 0 9px}.sub,.small{font-size:12px;color:#6b7280}.sub{color:#d
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .manage{display:grid;grid-template-columns:1fr 105px;gap:7px;margin-top:8px}
 .manage input{min-width:0}
-.timer{font-size:42px;font-weight:800;text-align:center;margin:8px}
+ .timer{font-size:64px;font-weight:900;text-align:center;margin:12px;font-variant-numeric:tabular-nums}.timer-big{position:relative;padding:8px 0}.timer-ring{width:190px;height:190px;border-radius:50%;margin:0 auto 12px;display:grid;place-items:center;background:conic-gradient(#111827 var(--p,100%),#e5e7eb 0)}.timer-ring:after{content:'';width:150px;height:150px;border-radius:50%;background:#fff;position:absolute}.timer-ring .timer{position:relative;z-index:1;margin:0}
 .timerbar{height:8px;background:#e5e7eb;border-radius:9px;overflow:hidden}
 .timerbar div{height:100%;width:100%;background:#111827;transition:width 1s linear}
 canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
 .stepper{display:flex;gap:4px;align-items:center}.stepper button{border:0;border-radius:8px;padding:8px 11px;background:#e5e7eb;font-weight:800;font-size:17px}.stepper input{min-width:0;text-align:center}
 .session-options{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}.check{display:flex;gap:7px;align-items:center;font-weight:700}
 .summary{background:#eef2ff;border-radius:12px;padding:12px;margin-top:10px}.mini{font-size:13px}
-@media(max-width:430px){.grid2{grid-template-columns:1fr}.manage{grid-template-columns:1fr 90px}.tabs button{white-space:nowrap}}
+@media(max-width:430px){.grid2{grid-template-columns:1fr}.manage{grid-template-columns:1fr 90px}.tabs button{white-space:nowrap}.timer-ring{width:170px;height:170px}.timer-ring:after{width:132px;height:132px}.timer{font-size:54px}}
 </style>
 </head>
 <body>
@@ -73,7 +73,7 @@ canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;backg
 <section id="routines" class="hidden">
 <div class="card">
 <h2>⚙️ Mis ejercicios</h2>
-<p class="small">Aquí puedes añadir, cambiar el nombre, modificar las series/repeticiones objetivo o borrar cualquier ejercicio. Los cambios se guardan en este dispositivo.</p>
+<p class="small">Aquí puedes crear rutinas, cambiar ejercicios, configurar descansos y crear circuitos. Todo se guarda en este dispositivo.</p>
 <div class="actions"><button class="btn" onclick="restoreDefaults()">↩ Restaurar Empuje/Tirón</button><button class="btn primary" onclick="addRoutine()">➕ Nueva rutina</button></div>
 <div id="routineManager"></div>
 </div>
@@ -102,7 +102,7 @@ canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;backg
 <button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo</button>
 </div>
 <input id="fileInput" type="file" accept="application/json" hidden onchange="importData(event)">
-<p id="dataInfo" class="small" style="margin-top:12px"></p><p class="small">Mi Rutina v4 · El peso es opcional.</p>
+<p id="dataInfo" class="small" style="margin-top:12px"></p><p class="small">Mi Rutina v5 · Peso opcional · Circuitos · Temporizador avanzado · Historial y progreso.</p>
 </div>
 </section>
 </main>
@@ -192,18 +192,27 @@ function previousForExercise(name){
  return null;
 }
 
+function exObj(x){
+  if(Array.isArray(x)) return {name:x[0]||'',target:x[1]||'',mode:'normal',rest:90,group:'',between:15,roundRest:60,rounds:3,note:''};
+  return Object.assign({name:'',target:'',mode:'normal',rest:90,group:'',between:15,roundRest:60,rounds:3,note:''},x||{});
+}
+function normalizeRoutineExercises(){
+  routines.forEach(r=>r.exercises=(r.exercises||[]).map(exObj));
+}
+normalizeRoutineExercises();
+persistRoutines();
+
 function startSession(id){
   const r=routines.find(x=>x.id===id); if(!r)return;
   current={id:Date.now(),date:document.getElementById('sessionDate').value||isoToday(),
     type:id,routineName:r.name,useWeight:document.getElementById('useWeight').checked,
-    exercises:r.exercises.map(x=>({name:x[0],target:x[1],
-      sets:[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]}))};
+    exercises:r.exercises.map(x=>({...exObj(x),sets:[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]}))};
   renderSession();
 }
 
 function previousForExercise(name){
   const sorted=data.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
-  for(const s of sorted){const e=s.exercises.find(x=>x.name===name);if(e)return e;}
+  for(const s of sorted){const e=s.exercises.find(x=>(Array.isArray(x)?x[0]:x.name)===name);if(e)return e;}
   return null;
 }
 
@@ -215,47 +224,58 @@ function stepValue(i,j,field,delta){
   set[field]=String(n); renderSession();
 }
 
+function groupExercises(){
+  const groups={};
+  current.exercises.forEach((e,i)=>{
+    const key=e.mode==='circuit'&&e.group?e.group:'normal-'+i;
+    (groups[key]??=[]).push({e,i});
+  });
+  return Object.values(groups);
+}
+
 function renderSession(){
   const s=document.getElementById('session');
-  s.innerHTML=`<div class="card"><h2>${escapeHtml(current.routineName)}</h2>
-  <div class="small">${fmt(current.date)} · ${current.useWeight?'Con peso':'Sin peso'}</div>
-  ${current.exercises.map((e,i)=>{
-    const prev=previousForExercise(e.name);
-    const prevText=prev?prev.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+' kg × ':'')+x.reps).join(' · '):'';
-    return `<div class="exercise">
-    <div class="exhead"><strong>${i+1}. ${escapeHtml(e.name)}</strong><span class="tag">${escapeHtml(e.target)}</span></div>
-    ${prevText?`<div class="small" style="margin-top:6px">Última vez: <strong>${escapeHtml(prevText)}</strong></div>`:'<div class="small" style="margin-top:6px">Primera vez registrada</div>'}
-    <div class="rows">
-      <span></span><span class="small">${current.useWeight?'kg':''}</span><span class="small">reps</span><span></span>
-      ${e.sets.map((set,j)=>`
-        <span>${j+1}</span>
-        ${current.useWeight?`<div class="stepper"><button onclick="stepValue(${i},${j},'weight',-0.5)">−</button><input inputmode="decimal" placeholder="kg" value="${escapeAttr(set.weight)}" oninput="current.exercises[${i}].sets[${j}].weight=this.value"><button onclick="stepValue(${i},${j},'weight',0.5)">+</button></div>`:'<span></span>'}
-        <div class="stepper"><button onclick="stepValue(${i},${j},'reps',-1)">−</button><input inputmode="numeric" placeholder="reps" value="${escapeAttr(set.reps)}" oninput="current.exercises[${i}].sets[${j}].reps=this.value"><button onclick="stepValue(${i},${j},'reps',1)">+</button></div>
-        <button onclick="removeSet(${i},${j})">×</button>`).join('')}
-    </div>
-    <div class="actions">
+  let htmlOut=`<div class="card"><h2>${escapeHtml(current.routineName)}</h2>
+  <div class="small">${fmt(current.date)} · ${current.useWeight?'Con peso':'Sin peso'}</div>`;
+  const groups=groupExercises();
+  groups.forEach((g,gi)=>{
+    if(g.length>1){
+      const first=g[0].e;
+      htmlOut+=`<div class="card" style="background:#f8fafc;border:2px solid #e5e7eb"><h3>🔄 ${escapeHtml(first.group||'Circuito')} · ${first.rounds||3} vueltas</h3>
+      <div class="small">${first.between||15}s entre ejercicios · ${first.roundRest||60}s entre vueltas</div>`;
+    }
+    g.forEach(({e,i})=>{
+      const prev=previousForExercise(e.name);
+      const prevText=prev?((Array.isArray(prev)?prev.sets:prev.sets)||[]).filter(x=>x.reps).map(x=>(x.weight?x.weight+' kg × ':'')+x.reps).join(' · '):'';
+      htmlOut+=`<div class="exercise">
+      <div class="exhead"><strong>${i+1}. ${escapeHtml(e.name)}</strong><span class="tag">${escapeHtml(e.target)} · ${e.mode==='circuit'?'🔄 Circuito':'⏱️ '+(e.rest||90)+' s'}</span></div>
+      ${e.note?`<div class="small" style="margin-top:6px">📝 ${escapeHtml(e.note)}</div>`:''}
+      ${prevText?`<div class="small" style="margin-top:6px">Última vez: <strong>${escapeHtml(prevText)}</strong></div>`:'<div class="small" style="margin-top:6px">Primera vez registrada</div>'}
+      <div class="rows"><span></span><span class="small">${current.useWeight?'kg':''}</span><span class="small">reps</span><span></span>
+      ${e.sets.map((set,j)=>`<span>${j+1}</span>
+      ${current.useWeight?`<div class="stepper"><button onclick="stepValue(${i},${j},'weight',-0.5)">−</button><input inputmode="decimal" placeholder="kg" value="${escapeAttr(set.weight)}" oninput="current.exercises[${i}].sets[${j}].weight=this.value"><button onclick="stepValue(${i},${j},'weight',0.5)">+</button></div>`:'<span></span>'}
+      <div class="stepper"><button onclick="stepValue(${i},${j},'reps',-1)">−</button><input inputmode="numeric" placeholder="reps" value="${escapeAttr(set.reps)}" oninput="current.exercises[${i}].sets[${j}].reps=this.value"><button onclick="stepValue(${i},${j},'reps',1)">+</button></div>
+      <button onclick="removeSet(${i},${j})">×</button>`).join('')}</div>
+      <div class="actions">
       <button class="btn" onclick="addSet(${i})">+ Serie</button>
       ${prevText?`<button class="btn" onclick="copyPrevious(${i})">↩ Copiar última</button>`:''}
-      <button class="btn" onclick="startTimer()">⏱️ Descanso</button>
-    </div></div>`;
-  }).join('')}
-  <div class="actions"><button class="btn primary" onclick="saveSession()">💾 Guardar sesión</button><button class="btn" onclick="cancelSession()">Cancelar</button></div></div>`;
+      <button class="btn" onclick="startTimer(${e.mode==='circuit'?e.between:e.rest},'${escapeAttr(e.name)}')">⏱️ ${e.mode==='circuit'?e.between:e.rest}s</button>
+      </div></div>`;
+    });
+    if(g.length>1) htmlOut+=`</div>`;
+  });
+  htmlOut+=`<div class="actions"><button class="btn primary" onclick="saveSession()">💾 Guardar sesión</button><button class="btn" onclick="cancelSession()">Cancelar</button></div></div>`;
+  s.innerHTML=htmlOut;
 }
 
 function cancelSession(){current=null;document.getElementById('session').innerHTML='';}
-
 function copyPrevious(i){
-  const prev=previousForExercise(current.exercises[i].name); if(!prev)return;
-  current.exercises[i].sets=prev.sets.map(x=>({weight:current.useWeight?(x.weight||''):'',reps:x.reps||''}));
+  const prev=previousForExercise(current.exercises[i].name);if(!prev)return;
+  current.exercises[i].sets=(prev.sets||[]).map(x=>({weight:current.useWeight?(x.weight||''):'',reps:x.reps||''}));
   renderSession();
 }
-
 function addSet(i){current.exercises[i].sets.push({weight:'',reps:''});renderSession();}
-
-function removeSet(i,j){
-  if(current.exercises[i].sets.length>1)current.exercises[i].sets.splice(j,1);
-  renderSession();
-}
+function removeSet(i,j){if(current.exercises[i].sets.length>1)current.exercises[i].sets.splice(j,1);renderSession();}
 
 function saveSession(){
   const finished=current;
@@ -274,13 +294,31 @@ function renderRoutineButtons(){
  el.innerHTML=routines.map(r=>`<button class="btn primary" onclick="startSession('${r.id}')">▶️ ${escapeHtml(r.name)}</button>`).join('');
 }
 function renderRoutineManager(){
- const el=document.getElementById('routineManager');
- el.innerHTML=routines.map(r=>`<div class="card">
+  const el=document.getElementById('routineManager');
+  el.innerHTML=routines.map(r=>`<div class="card">
   <div class="manage"><input type="text" value="${escapeAttr(r.name)}" onchange="renameRoutine('${r.id}',this.value)"><button class="btn danger" onclick="deleteRoutine('${r.id}')">🗑️ Rutina</button></div>
   <div class="actions"><button class="btn primary" onclick="addExerciseToRoutine('${r.id}')">➕ Añadir ejercicio</button><button class="btn" onclick="duplicateRoutine('${r.id}')">📋 Duplicar rutina</button></div>
-  ${r.exercises.map((x,i)=>`<div class="exercise"><div class="small">Ejercicio ${i+1}</div><div class="manage"><input type="text" value="${escapeAttr(x[0])}" onchange="renameExercise('${r.id}',${i},this.value)"><input type="text" value="${escapeAttr(x[1])}" onchange="changeTarget('${r.id}',${i},this.value)" placeholder="4 × 6-8"></div><div class="actions"><button class="btn" onclick="moveExercise('${r.id}',${i},-1)">↑</button><button class="btn" onclick="moveExercise('${r.id}',${i},1)">↓</button><button class="btn danger" onclick="deleteExercise('${r.id}',${i})">🗑️ Borrar ejercicio</button></div></div>`).join('')}
- </div>`).join('')+`<div class="card"><button class="btn primary" onclick="addRoutine()">➕ Crear nueva rutina</button></div>`;
+  ${r.exercises.map((raw,i)=>{const x=exObj(raw);return `<div class="exercise">
+  <div class="small">Ejercicio ${i+1}</div>
+  <div class="manage"><input type="text" value="${escapeAttr(x.name)}" onchange="renameExercise('${r.id}',${i},this.value)"><input type="text" value="${escapeAttr(x.target)}" onchange="changeTarget('${r.id}',${i},this.value)" placeholder="4 × 6-8"></div>
+  <div class="grid2" style="margin-top:8px">
+   <label class="small">Modo<select onchange="changeExerciseSetting('${r.id}',${i},'mode',this.value)"><option value="normal" ${x.mode==='normal'?'selected':''}>Serie normal</option><option value="circuit" ${x.mode==='circuit'?'selected':''}>🔄 Circuito</option></select></label>
+   <label class="small">Descanso normal (s)<input type="number" min="0" step="15" value="${x.rest||90}" onchange="changeExerciseSetting('${r.id}',${i},'rest',this.value)"></label>
+  </div>
+  <div class="grid2" style="margin-top:8px">
+   <label class="small">Circuito<select onchange="changeExerciseSetting('${r.id}',${i},'group',this.value)"><option value="">— Sin circuito —</option>${['Circuito 1','Circuito 2','Circuito 3'].map(g=>`<option ${x.group===g?'selected':''}>${g}</option>`).join('')}</select></label>
+   <label class="small">Nota<input type="text" value="${escapeAttr(x.note||'')}" placeholder="Opcional" onchange="changeExerciseSetting('${r.id}',${i},'note',this.value)"></label>
+  </div>
+  ${x.mode==='circuit'?`<div class="grid2" style="margin-top:8px">
+   <label class="small">Entre ejercicios (s)<input type="number" min="0" step="5" value="${x.between||15}" onchange="changeExerciseSetting('${r.id}',${i},'between',this.value)"></label>
+   <label class="small">Entre vueltas (s)<input type="number" min="0" step="15" value="${x.roundRest||60}" onchange="changeExerciseSetting('${r.id}',${i},'roundRest',this.value)"></label>
+  </div>
+  <label class="small" style="display:block;margin-top:8px">Vueltas<input type="number" min="1" max="20" value="${x.rounds||3}" onchange="changeExerciseSetting('${r.id}',${i},'rounds',this.value)"></label>`:''}
+  <div class="actions"><button class="btn" onclick="moveExercise('${r.id}',${i},-1)">↑</button><button class="btn" onclick="moveExercise('${r.id}',${i},1)">↓</button><button class="btn danger" onclick="deleteExercise('${r.id}',${i})">🗑️ Borrar ejercicio</button></div>
+  </div>`}).join('')}
+  </div>`).join('')+`<div class="card"><button class="btn primary" onclick="addRoutine()">➕ Crear nueva rutina</button></div>`;
 }
+
 function duplicateRoutine(id){
   const r=findRoutine(id);if(!r)return;
   const copy=JSON.parse(JSON.stringify(r));copy.id='R'+Date.now();copy.name=r.name+' (copia)';
@@ -293,14 +331,15 @@ function moveExercise(id,index,dir){
   persistRoutines();renderRoutineManager();
 }
 function findRoutine(id){return routines.find(r=>r.id===id)}
-function renameRoutine(id,value){const r=findRoutine(id); value=value.trim(); if(!r||!value)return renderRoutineManager(); r.name=value; persistRoutines(); renderRoutineManager(); renderRoutineButtons()}
-function deleteRoutine(id){if(routines.length<=1){alert('Debe quedar al menos una rutina.');return} const r=findRoutine(id); if(!r)return; if(!confirm('¿Borrar la rutina "'+r.name+'"? No se borrará el historial.'))return; routines=routines.filter(x=>x.id!==id); persistRoutines(); renderRoutineManager(); renderRoutineButtons()}
-function addRoutine(){const name=prompt('Nombre de la nueva rutina:'); if(!name||!name.trim())return; const id='R'+Date.now(); routines.push({id,name:name.trim(),exercises:[]}); persistRoutines(); renderRoutineManager(); renderRoutineButtons()}
-function addExerciseToRoutine(id){const r=findRoutine(id); if(!r)return; const name=prompt('Nombre del nuevo ejercicio:'); if(!name||!name.trim())return; const target=prompt('Series y repeticiones objetivo:','3 × 8-12'); r.exercises.push([name.trim(),(target||'').trim()]); persistRoutines(); renderRoutineManager()}
-function renameExercise(id,index,value){const r=findRoutine(id); value=value.trim(); if(!r||!value){renderRoutineManager();return} r.exercises[index][0]=value; persistRoutines(); renderRoutineManager()}
-function changeTarget(id,index,value){const r=findRoutine(id); if(!r)return; r.exercises[index][1]=value.trim(); persistRoutines(); renderRoutineManager()}
-function deleteExercise(id,index){const r=findRoutine(id); if(!r)return; const name=r.exercises[index][0]; if(!confirm('¿Borrar "'+name+'"? No se borrará de sesiones antiguas.'))return; r.exercises.splice(index,1); persistRoutines(); renderRoutineManager()}
-function restoreDefaults(){if(!confirm('¿Restaurar Empuje y Tirón originales? Las nuevas rutinas no se borrarán.'))return; const a=findRoutine('A'),b=findRoutine('B'); if(a)a.exercises=cloneDefaults().A;if(b)b.exercises=cloneDefaults().B; persistRoutines();renderRoutineManager();renderRoutineButtons()}
+function renameRoutine(id,value){const r=findRoutine(id);value=value.trim();if(!r||!value)return renderRoutineManager();r.name=value;persistRoutines();renderRoutineManager();renderRoutineButtons()}
+function deleteRoutine(id){if(routines.length<=1){alert('Debe quedar al menos una rutina.');return}const r=findRoutine(id);if(!r)return;if(!confirm('¿Borrar la rutina "'+r.name+'"? No se borrará el historial.'))return;routines=routines.filter(x=>x.id!==id);persistRoutines();renderRoutineManager();renderRoutineButtons()}
+function addRoutine(){const name=prompt('Nombre de la nueva rutina:');if(!name||!name.trim())return;const id='R'+Date.now();routines.push({id,name:name.trim(),exercises:[]});persistRoutines();renderRoutineManager();renderRoutineButtons()}
+function addExerciseToRoutine(id){const r=findRoutine(id);if(!r)return;const name=prompt('Nombre del nuevo ejercicio:');if(!name||!name.trim())return;const target=prompt('Series y repeticiones objetivo:','3 × 8-12');r.exercises.push({name:name.trim(),target:(target||'').trim(),mode:'normal',rest:90,group:'',between:15,roundRest:60,rounds:3,note:''});persistRoutines();renderRoutineManager()}
+function renameExercise(id,index,value){const r=findRoutine(id);value=value.trim();if(!r||!value){renderRoutineManager();return}r.exercises[index]=exObj(r.exercises[index]);r.exercises[index].name=value;persistRoutines();renderRoutineManager()}
+function changeTarget(id,index,value){const r=findRoutine(id);if(!r)return;r.exercises[index]=exObj(r.exercises[index]);r.exercises[index].target=value.trim();persistRoutines();renderRoutineManager()}
+function changeExerciseSetting(id,index,key,value){const r=findRoutine(id);if(!r)return;r.exercises[index]=exObj(r.exercises[index]);if(['rest','between','roundRest','rounds'].includes(key))value=Math.max(0,parseInt(value)||0);r.exercises[index][key]=value;persistRoutines();renderRoutineManager()}
+function deleteExercise(id,index){const r=findRoutine(id);if(!r)return;const name=exObj(r.exercises[index]).name;if(!confirm('¿Borrar "'+name+'"? No se borrará de sesiones antiguas.'))return;r.exercises.splice(index,1);persistRoutines();renderRoutineManager()}
+function restoreDefaults(){if(!confirm('¿Restaurar Empuje y Tirón originales? Las nuevas rutinas no se borrarán.'))return;const d=cloneDefaults();const a=findRoutine('A'),b=findRoutine('B');if(a)a.exercises=d.A.map(x=>exObj(x));if(b)b.exercises=d.B.map(x=>exObj(x));persistRoutines();renderRoutineManager();renderRoutineButtons()}
 
 function deleteSession(id){
  if(!confirm('¿Borrar esta sesión?'))return;
@@ -321,98 +360,99 @@ function deleteAllHistory(){
 }
 
 function renderHistory(){
- const el=document.getElementById('historyList');
- if(!data.length){
-  el.innerHTML='<p class="small">Todavía no hay sesiones guardadas.</p>';
-  return;
- }
- el.innerHTML='<div class="actions"><button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo</button></div>'+
- data.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(s=>
- `<div class="history-item"><div class="history-head"><div>
- <strong>${fmt(s.date)} — ${escapeHtml(s.routineName || (findRoutine(s.type)?.name || s.type))}</strong>
- <div>${s.exercises.map(e=>{
-   const r=e.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+'kg × ':'')+x.reps).join(', ');
-   return r?`<span class="pill">${escapeHtml(e.name)}: ${escapeHtml(r)}</span>`:'';
- }).filter(Boolean).join('')}</div></div>
- <button class="btn danger" onclick="deleteSession(${s.id})">×</button></div></div>`).join('');
+  const el=document.getElementById('historyList');
+  renderWeeklySummary();
+  setupHistoryExercise();
+  if(!data.length){el.innerHTML='<p class="small">Todavía no hay sesiones guardadas.</p>';return;}
+  el.innerHTML='<div class="actions"><button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo</button></div>'+
+  data.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(s=>{
+    const volume=s.useWeight?s.exercises.reduce((n,e)=>n+e.sets.reduce((a,x)=>a+(parseFloat(x.weight)||0)*(parseFloat(x.reps)||0),0),0):0;
+    return `<div class="history-item"><div class="history-head"><div><strong>${fmt(s.date)} — ${escapeHtml(s.routineName||findRoutine(s.type)?.name||s.type)}</strong>
+    <div class="small">${s.exercises.reduce((n,e)=>n+e.sets.filter(x=>x.reps).length,0)} series · ${s.exercises.reduce((n,e)=>n+e.sets.reduce((a,x)=>a+(parseFloat(x.reps)||0),0),0)} reps${volume?` · ${volume.toFixed(1)} kg`:''}</div>
+    <div>${s.exercises.map(e=>{const name=Array.isArray(e)?e[0]:e.name;const r=e.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+'kg × ':'')+x.reps).join(', ');return r?`<span class="pill">${escapeHtml(name)}: ${escapeHtml(r)}</span>`:''}).filter(Boolean).join('')}</div></div>
+    <button class="btn danger" onclick="deleteSession(${s.id})">×</button></div></div>`;
+  }).join('');
+}
+
+function renderWeeklySummary(){
+  const box=document.getElementById('weeklySummary');if(!box)return;
+  const now=new Date(), start=new Date(now);start.setDate(now.getDate()-6);start.setHours(0,0,0,0);
+  const week=data.filter(s=>new Date(s.date+'T12:00:00')>=start);
+  const sessions=week.length, sets=week.reduce((n,s)=>n+s.exercises.reduce((a,e)=>a+e.sets.filter(x=>x.reps).length,0),0);
+  const reps=week.reduce((n,s)=>n+s.exercises.reduce((a,e)=>a+e.sets.reduce((q,x)=>q+(parseFloat(x.reps)||0),0),0),0);
+  box.innerHTML=`<div class="grid2"><div class="summary"><strong>${sessions}</strong><div class="small">Sesiones</div></div><div class="summary"><strong>${sets}</strong><div class="small">Series</div></div><div class="summary"><strong>${reps}</strong><div class="small">Repeticiones</div></div><div class="summary"><strong>${week.filter(s=>s.useWeight).length}</strong><div class="small">Sesiones con peso</div></div></div>`;
+}
+
+function setupHistoryExercise(){
+  const sel=document.getElementById('historyExercise');if(!sel)return;
+  const names=[...new Set(data.flatMap(s=>s.exercises.map(e=>Array.isArray(e)?e[0]:e.name)))];
+  const old=sel.value;sel.innerHTML=names.map(n=>`<option>${escapeHtml(n)}</option>`).join('');if(old&&names.includes(old))sel.value=old;
+  renderExerciseHistory();
+}
+function renderExerciseHistory(){
+  const sel=document.getElementById('historyExercise'),box=document.getElementById('exerciseHistory');if(!sel||!box)return;
+  if(!sel.value){box.innerHTML='<p class="small">Guarda sesiones para ver el historial.</p>';return;}
+  const rows=[];
+  data.slice().sort((a,b)=>b.date.localeCompare(a.date)).forEach(s=>{
+    const e=s.exercises.find(x=>(Array.isArray(x)?x[0]:x.name)===sel.value);if(!e)return;
+    const sets=e.sets.filter(x=>x.reps);if(!sets.length)return;
+    const max=Math.max(...sets.map(x=>parseFloat(x.reps)||0));
+    const vol=sets.reduce((n,x)=>n+(parseFloat(x.weight)||0)*(parseFloat(x.reps)||0),0);
+    rows.push(`<div class="history-item"><strong>${fmt(s.date)}</strong><div class="small">${sets.map(x=>(x.weight?x.weight+' kg × ':'')+x.reps).join(' · ')} · mejor serie ${max}${vol?' · '+vol.toFixed(1)+' kg':''}</div></div>`);
+  });
+  box.innerHTML=rows.length?rows.join(''):'<p class="small">No hay registros para este ejercicio.</p>';
 }
 
 function setupStats(){
- const names=[...new Set(data.flatMap(s=>s.exercises.map(e=>e.name)))];
- const sel=document.getElementById('statExercise');
- const old=sel.value;
- sel.innerHTML=names.map(n=>`<option>${escapeHtml(n)}</option>`).join('');
- if(old&&names.includes(old))sel.value=old;
- drawChart();
+  const names=[...new Set(data.flatMap(s=>s.exercises.map(e=>Array.isArray(e)?e[0]:e.name)))];
+  const sel=document.getElementById('statExercise'),old=sel.value;
+  sel.innerHTML=names.map(n=>`<option>${escapeHtml(n)}</option>`).join('');
+  if(old&&names.includes(old))sel.value=old;drawChart();
 }
-
 function drawChart(){
- const c=document.getElementById('chart'),ctx=c.getContext('2d'),sel=document.getElementById('statExercise');
- ctx.clearRect(0,0,c.width,c.height);
- if(!sel.value){
-  document.getElementById('best').textContent='Guarda sesiones para ver la progresión.';
-  return;
- }
- const pts=[];
- data.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(s=>{
-  const e=s.exercises.find(x=>x.name===sel.value);
-  if(!e)return;
-  const vals=e.sets.map(x=>parseFloat(x.reps)).filter(Number.isFinite);
-  if(vals.length)pts.push({v:Math.max(...vals),date:s.date});
- });
- if(!pts.length){
-  document.getElementById('best').textContent='No hay repeticiones registradas.';
-  return;
- }
- const max=Math.max(...pts.map(p=>p.v)),min=Math.min(...pts.map(p=>p.v)),pad=35,w=c.width-pad*2,h=c.height-pad*2;
- ctx.strokeStyle='#d1d5db';
- ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,pad+h);ctx.lineTo(pad+w,pad+h);ctx.stroke();
- ctx.beginPath();
- pts.forEach((p,i)=>{
-  const x=pad+i/Math.max(1,pts.length-1)*w,y=pad+h-(p.v-min)/Math.max(1,max-min)*h;
-  i?ctx.lineTo(x,y):ctx.moveTo(x,y);
- });
- ctx.stroke();
- pts.forEach((p,i)=>{
-  const x=pad+i/Math.max(1,pts.length-1)*w,y=pad+h-(p.v-min)/Math.max(1,max-min)*h;
-  ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fill();
- });
- const bestVol=Math.max(...pts.map(p=>p.volume||0));document.getElementById('best').textContent=`Mejor serie: ${max} repeticiones · Registros: ${pts.length}${anyWeight&&bestVol>0?' · Mayor volumen: '+bestVol.toFixed(1)+' kg':''}`;
+  const c=document.getElementById('chart'),ctx=c.getContext('2d'),sel=document.getElementById('statExercise');ctx.clearRect(0,0,c.width,c.height);
+  if(!sel.value){document.getElementById('best').textContent='Guarda sesiones para ver la progresión.';return;}
+  const pts=[];let anyWeight=false;
+  data.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(s=>{
+    const e=s.exercises.find(x=>(Array.isArray(x)?x[0]:x.name)===sel.value);if(!e)return;
+    const vals=e.sets.map(x=>parseFloat(x.reps)).filter(Number.isFinite);
+    const vol=e.sets.reduce((n,x)=>n+(parseFloat(x.weight)||0)*(parseFloat(x.reps)||0),0);if(vol>0)anyWeight=true;
+    if(vals.length)pts.push({v:Math.max(...vals),volume:vol,date:s.date});
+  });
+  if(!pts.length){document.getElementById('best').textContent='No hay repeticiones registradas.';return;}
+  const max=Math.max(...pts.map(p=>p.v)),min=Math.min(...pts.map(p=>p.v)),pad=35,w=c.width-pad*2,h=c.height-pad*2;
+  ctx.strokeStyle='#d1d5db';ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,pad+h);ctx.lineTo(pad+w,pad+h);ctx.stroke();
+  ctx.beginPath();pts.forEach((p,i)=>{const x=pad+i/Math.max(1,pts.length-1)*w,y=pad+h-(p.v-min)/Math.max(1,max-min)*h;i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();
+  pts.forEach((p,i)=>{const x=pad+i/Math.max(1,pts.length-1)*w,y=pad+h-(p.v-min)/Math.max(1,max-min)*h;ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fill()});
+  const bestVol=Math.max(...pts.map(p=>p.volume||0));
+  document.getElementById('best').textContent=`Mejor serie: ${max} repeticiones · Registros: ${pts.length}${anyWeight&&bestVol>0?' · Mayor volumen: '+bestVol.toFixed(1)+' kg':''}`;
 }
 
-function startTimer(){
- stopTimer();
- let left=parseInt(document.getElementById('restSelect').value);
- const box=document.createElement('div');
- box.className='card';box.id='timerBox';
- box.innerHTML='<h3>⏱️ Descanso</h3><div class="timer" id="timerNum"></div><div class="timerbar"><div id="timerBar"></div></div><div class="actions"><button class="btn danger" onclick="stopTimer()">Parar</button></div>';
- document.body.appendChild(box);
- const total=left;
- function tick(){
-  const n=document.getElementById('timerNum');
-  const bar=document.getElementById('timerBar');
-  if(!n)return;
-  n.textContent=left+' s';
-  bar.style.width=(left/total*100)+'%';
-  if(left<=0){
-   clearInterval(timer);
-   navigator.vibrate?.([300,100,300]);
-   n.textContent='¡Listo!';
-   return;
-  }
-  left--;
- }
- tick();timer=setInterval(tick,1000);
+function startTimer(seconds=null,label='Descanso'){
+  stopTimer();
+  let total=parseInt(seconds??document.getElementById('restSelect').value)||90,left=total;
+  const box=document.createElement('div');box.className='card';box.id='timerBox';
+  box.innerHTML=`<h3>⏱️ ${escapeHtml(label)}</h3><div class="timer-big"><div class="timer-ring" id="timerRing" style="--p:100%"><div class="timer" id="timerNum"></div></div></div>
+  <div class="timerbar"><div id="timerBar"></div></div><div class="actions">
+  <button class="btn" onclick="adjustTimer(-15)">−15 s</button><button class="btn" onclick="pauseTimer()">Pausar</button><button class="btn" onclick="adjustTimer(15)">+15 s</button><button class="btn danger" onclick="stopTimer()">Parar</button></div>`;
+  document.body.appendChild(box);timerState={left,total,paused:false};
+  tickTimer();
+  timer=setInterval(tickTimer,1000);
 }
-
-function stopTimer(){
- clearInterval(timer);
- document.getElementById('timerBox')?.remove();
+let timerState={left:0,total:0,paused:false};
+function tickTimer(){
+  const n=document.getElementById('timerNum'),bar=document.getElementById('timerBar'),ring=document.getElementById('timerRing');if(!n)return;
+  n.textContent=timerState.left+' s';bar.style.width=(timerState.left/Math.max(1,timerState.total)*100)+'%';ring.style.setProperty('--p',(timerState.left/Math.max(1,timerState.total)*100)+'%');
+  if(timerState.left<=0){clearInterval(timer);navigator.vibrate?.([300,100,300]);n.textContent='¡Listo!';return;}
+  if(!timerState.paused)timerState.left--;
 }
+function adjustTimer(delta){timerState.left=Math.max(0,timerState.left+delta);timerState.total=Math.max(timerState.total,timerState.left);tickTimer();}
+function pauseTimer(){timerState.paused=!timerState.paused;event?.target?.textContent=timerState.paused?'Continuar':'Pausar';}
+function stopTimer(){clearInterval(timer);document.getElementById('timerBox')?.remove();}
 
 function exportData(){
  const payload={
-  version:3,
+  version:4,
   exported:new Date().toISOString(),
   data:data,
   routines:routines
@@ -436,6 +476,7 @@ function importData(e){
    if(!confirm('¿Reemplazar el historial y los ejercicios actuales por la copia?'))return;
    data=x.data;
    if(Array.isArray(x.routines)&&x.routines.length)routines=x.routines; else if(x.routines&&x.routines.A&&x.routines.B)routines=[{id:'A',name:'Empuje + Cuádriceps',exercises:x.routines.A},{id:'B',name:'Tirón + Posterior + Abs',exercises:x.routines.B}];
+    normalizeRoutineExercises();
    persistData();persistRoutines();
    updateInfo();
    alert('Copia restaurada correctamente.');
