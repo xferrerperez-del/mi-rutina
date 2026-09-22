@@ -7,18 +7,35 @@
 <link rel="manifest" href="manifest.json">
 <title>Mi Rutina</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f4f6;color:#111827}
-header{background:#111827;color:white;padding:18px 16px;position:sticky;top:0;z-index:5}
-h1,h2,h3,p{margin:0 0 10px}.sub{opacity:.75;font-size:13px}.wrap{max-width:760px;margin:auto;padding:14px}
-.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs button,.btn{border:0;border-radius:10px;padding:11px 14px;font-weight:700;background:#e5e7eb;color:#111827}
-.tabs button.active,.btn.primary{background:#111827;color:white}.card{background:white;border-radius:14px;padding:15px;margin:10px 0;box-shadow:0 1px 4px #00000012}
-.exercise{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:10px 0}.exhead{display:flex;justify-content:space-between;gap:8px}.tag{font-size:12px;color:#6b7280}
-.rows{display:grid;grid-template-columns:40px 1fr 1fr 42px;gap:7px;align-items:center;margin-top:8px}.rows input{width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;font-size:16px}.rows button{border:0;border-radius:8px;padding:9px;background:#fee2e2}
-.small{font-size:12px;color:#6b7280}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;background:white}
-select,input[type=date]{padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:15px}
-.history-item{padding:12px 0;border-bottom:1px solid #eee}.muted{color:#6b7280}
-.hidden{display:none}.danger{background:#fee2e2!important;color:#991b1b!important}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f4f6;color:#111827}
+header{background:#111827;color:#fff;padding:16px;position:sticky;top:0;z-index:10}
+.wrap{max-width:760px;margin:auto;padding:12px}
+h1,h2,h3,p{margin:0 0 9px}.sub,.small{font-size:12px;color:#6b7280}.sub{color:#d1d5db}
+.tabs{display:flex;gap:6px;overflow:auto;margin-bottom:12px}
+.tabs button,.btn{border:0;border-radius:10px;padding:10px 13px;font-weight:700;background:#e5e7eb;color:#111827}
+.tabs button.active,.btn.primary{background:#111827;color:#fff}
+.btn.danger{background:#fee2e2!important;color:#991b1b!important}
+.card{background:#fff;border-radius:14px;padding:14px;margin:10px 0;box-shadow:0 1px 5px #0001}
+.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.exercise{border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:10px 0}
+.exhead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.tag{font-size:12px;color:#6b7280}
+.rows{display:grid;grid-template-columns:34px 1fr 1fr 40px;gap:6px;align-items:center;margin-top:8px}
+.rows input,input[type=date],input[type=text],input[type=number],select{width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;font-size:16px;background:#fff}
+.rows button{border:0;border-radius:8px;padding:9px;background:#fee2e2;color:#991b1b;font-size:18px}
+.hidden{display:none}
+.history-item{padding:12px 0;border-bottom:1px solid #eee}
+.history-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.pill{display:inline-block;background:#eef2ff;border-radius:999px;padding:3px 8px;font-size:11px;margin:2px 3px 2px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.manage{display:grid;grid-template-columns:1fr 105px;gap:7px;margin-top:8px}
+.manage input{min-width:0}
+.timer{font-size:42px;font-weight:800;text-align:center;margin:8px}
+.timerbar{height:8px;background:#e5e7eb;border-radius:9px;overflow:hidden}
+.timerbar div{height:100%;width:100%;background:#111827;transition:width 1s linear}
+canvas{width:100%;height:220px;border:1px solid #e5e7eb;border-radius:10px;background:#fff}
+@media(max-width:430px){.grid2{grid-template-columns:1fr}.manage{grid-template-columns:1fr 90px}.tabs button{white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -26,20 +43,39 @@ select,input[type=date]{padding:10px;border:1px solid #d1d5db;border-radius:8px;
 <main class="wrap">
 <div class="tabs">
 <button class="active" data-tab="train">Entrenar</button>
+<button data-tab="routines">Ejercicios</button>
 <button data-tab="history">Historial</button>
 <button data-tab="stats">Estadísticas</button>
+<button data-tab="tools">Datos</button>
 </div>
 
 <section id="train">
 <div class="card">
-<h2>Sesión de hoy</h2>
-<div class="small">La fecha se pone automáticamente y puedes entrenar cualquier día.</div>
+<h2>Sesión</h2>
+<div class="small">Elige la fecha, la rutina y registra tus series.</div>
+<div class="grid2" style="margin-top:10px">
+<label class="small">Fecha<input type="date" id="sessionDate"></label>
+<label class="small">Descanso<select id="restSelect"><option value="60">60 s</option><option value="90" selected>90 s</option><option value="120">120 s</option><option value="180">180 s</option></select></label>
+</div>
 <div class="actions">
 <button class="btn primary" onclick="startSession('A')">🟢 Empuje + Cuádriceps</button>
 <button class="btn primary" onclick="startSession('B')">🔵 Tirón + Posterior + Abs</button>
 </div>
 </div>
 <div id="session"></div>
+</section>
+
+<section id="routines" class="hidden">
+<div class="card">
+<h2>⚙️ Mis ejercicios</h2>
+<p class="small">Aquí puedes añadir, cambiar el nombre, modificar las series/repeticiones objetivo o borrar cualquier ejercicio. Los cambios se guardan en este dispositivo.</p>
+<div class="actions">
+<button class="btn primary" onclick="addExercise('A')">➕ Añadir a Empuje</button>
+<button class="btn primary" onclick="addExercise('B')">➕ Añadir a Tirón</button>
+<button class="btn" onclick="restoreDefaults()">↩ Restaurar ejercicios originales</button>
+</div>
+<div id="routineManager"></div>
+</div>
 </section>
 
 <section id="history" class="hidden">
@@ -54,117 +90,388 @@ select,input[type=date]{padding:10px;border:1px solid #d1d5db;border-radius:8px;
 <div id="best" class="small" style="margin-top:10px"></div>
 </div>
 </section>
+
+<section id="tools" class="hidden">
+<div class="card">
+<h2>💾 Datos</h2>
+<p class="small">Haz una copia antes de cambiar de móvil o navegador. La nueva versión mantiene los datos guardados con la clave anterior.</p>
+<div class="actions">
+<button class="btn primary" onclick="exportData()">⬇️ Exportar copia</button>
+<button class="btn" onclick="document.getElementById('fileInput').click()">⬆️ Importar copia</button>
+<button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo</button>
+</div>
+<input id="fileInput" type="file" accept="application/json" hidden onchange="importData(event)">
+<p id="dataInfo" class="small" style="margin-top:12px"></p>
+</div>
+</section>
 </main>
 
-<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(()=>{});
+<script>
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
 const KEY='miRutinaDataV1';
-const routines={
+const ROUTINE_KEY='miRutinaRoutinesV1';
+
+const defaultRoutines={
  A:[
-  ['Pino asistido','4 × 2-4'],['Sentadilla a una pierna','3-4 × 5-8'],
-  ['Pike Push Ups con piernas elevadas','3 × 6-10'],['Fondos en paralelas +20 kg','4 × 5-8'],
-  ['Flexiones en paralelas','3 × 8-15'],['Elevaciones laterales','3 × 12-20']
+  ['Pino asistido','4 × 2-4'],
+  ['Sentadilla a una pierna','3-4 × 5-8'],
+  ['Pike Push Ups con piernas elevadas','3 × 6-10'],
+  ['Fondos en paralelas +20 kg','4 × 5-8'],
+  ['Flexiones en paralelas','3 × 8-15'],
+  ['Elevaciones laterales','3 × 12-20']
  ],
  B:[
-  ['Dominadas pronas/neutras','4 × 5-8'],['Peso muerto rumano','3 × 8-12'],
-  ['Dominadas supinas','3 × 6-10'],['Australian Pull-ups','2-3 × 10-15'],
-  ['Gemelos a una pierna','3 × 15-20'],['Face Pulls','2-3 × 12-20'],
-  ['Ejercicio específico de bíceps','2-3 × 10-15'],['Abdomen','3 series']
+  ['Dominadas pronas/neutras','4 × 5-8'],
+  ['Peso muerto rumano','3 × 8-12'],
+  ['Dominadas supinas','3 × 6-10'],
+  ['Australian Pull-ups','2-3 × 10-15'],
+  ['Gemelos a una pierna','3 × 15-20'],
+  ['Face Pulls','2-3 × 12-20'],
+  ['Ejercicio específico de bíceps','2-3 × 10-15'],
+  ['Abdomen','3 series']
  ]
 };
-let data=JSON.parse(localStorage.getItem(KEY)||'[]'), current=null;
-const isoToday=()=>new Date().toISOString().slice(0,10);
-const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+function cloneDefaults(){
+ return JSON.parse(JSON.stringify(defaultRoutines));
+}
+
+let routines=loadRoutines();
+let data=loadData();
+let current=null;
+let timer=null;
+
+function loadData(){
+ try{
+  const old=JSON.parse(localStorage.getItem(KEY)||'[]');
+  return Array.isArray(old)?old:[];
+ }catch(e){return []}
+}
+
+function loadRoutines(){
+ try{
+  const saved=JSON.parse(localStorage.getItem(ROUTINE_KEY)||'null');
+  if(saved && saved.A && saved.B) return saved;
+ }catch(e){}
+ const d=cloneDefaults();
+ localStorage.setItem(ROUTINE_KEY,JSON.stringify(d));
+ return d;
+}
+
+function persistData(){localStorage.setItem(KEY,JSON.stringify(data))}
+function persistRoutines(){localStorage.setItem(ROUTINE_KEY,JSON.stringify(routines))}
+
+function isoToday(){
+ const d=new Date();
+ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function fmt(d){
+ return new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+
 document.getElementById('today').textContent=fmt(isoToday());
+document.getElementById('sessionDate').value=isoToday();
 
 document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
- document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+ document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+ b.classList.add('active');
  document.querySelectorAll('section').forEach(x=>x.classList.add('hidden'));
  document.getElementById(b.dataset.tab).classList.remove('hidden');
+ if(b.dataset.tab==='routines')renderRoutineManager();
  if(b.dataset.tab==='history')renderHistory();
  if(b.dataset.tab==='stats')setupStats();
+ if(b.dataset.tab==='tools')updateInfo();
 });
 
-
 function previousForExercise(name){
- const old=data.slice().reverse().find(s=>s.exercises.some(e=>e.name===name));
- return old ? old.exercises.find(e=>e.name===name) : null;
+ const sorted=data.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+ for(const s of sorted){
+  const e=s.exercises.find(x=>x.name===name);
+  if(e)return e;
+ }
+ return null;
 }
 
 function startSession(type){
- current={id:Date.now(),date:isoToday(),type,exercises:routines[type].map(x=>({name:x[0],target:x[1],sets:[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]}))};
+ current={
+  id:Date.now(),
+  date:document.getElementById('sessionDate').value||isoToday(),
+  type,
+  exercises:routines[type].map(x=>({
+   name:x[0],
+   target:x[1],
+   sets:[{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''},{weight:'',reps:''}]
+  }))
+ };
  renderSession();
 }
+
 function renderSession(){
  const s=document.getElementById('session');
  s.innerHTML=`<div class="card"><h2>${current.type==='A'?'🟢 Empuje + Cuádriceps':'🔵 Tirón + Posterior + Abs'}</h2>
  <div class="small">${fmt(current.date)}</div>
  ${current.exercises.map((e,i)=>{
    const prev=previousForExercise(e.name);
-   const prevText=prev ? prev.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+' kg × ':'')+x.reps).join(' · ') : '';
+   const prevText=prev?prev.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+' kg × ':'')+x.reps).join(' · '):'';
    return `<div class="exercise">
-   <div class="exhead"><strong>${i+1}. ${e.name}</strong><span class="tag">${e.target}</span></div>
-   ${prevText?`<div class="small" style="margin-top:6px">Última vez: <strong>${prevText}</strong></div>`:'<div class="small" style="margin-top:6px">Primera vez registrada</div>'}
+   <div class="exhead"><strong>${i+1}. ${escapeHtml(e.name)}</strong><span class="tag">${escapeHtml(e.target)}</span></div>
+   ${prevText?`<div class="small" style="margin-top:6px">Última vez: <strong>${escapeHtml(prevText)}</strong></div>`:'<div class="small" style="margin-top:6px">Primera vez registrada</div>'}
    <div class="rows">${e.sets.map((set,j)=>`<span>${j+1}</span>
-   <input placeholder="kg" inputmode="decimal" value="${set.weight}" oninput="current.exercises[${i}].sets[${j}].weight=this.value">
-   <input placeholder="reps" inputmode="numeric" value="${set.reps}" oninput="current.exercises[${i}].sets[${j}].reps=this.value">
+   <input placeholder="kg" inputmode="decimal" value="${escapeAttr(set.weight)}" oninput="current.exercises[${i}].sets[${j}].weight=this.value">
+   <input placeholder="reps" inputmode="numeric" value="${escapeAttr(set.reps)}" oninput="current.exercises[${i}].sets[${j}].reps=this.value">
    <button onclick="removeSet(${i},${j})">×</button>`).join('')}</div>
-   <button class="btn" style="margin-top:8px" onclick="addSet(${i})">+ Serie</button>
-   ${prevText?`<button class="btn" style="margin-top:8px;margin-left:5px" onclick="copyPrevious(${i})">↩ Copiar última</button>`:''}
+   <div class="actions">
+   <button class="btn" onclick="addSet(${i})">+ Serie</button>
+   ${prevText?`<button class="btn" onclick="copyPrevious(${i})">↩ Copiar última</button>`:''}
+   <button class="btn" onclick="startTimer()">⏱️ Descanso</button>
+   </div>
    </div>`;
  }).join('')}
- <div class="actions"><button class="btn primary" onclick="saveSession()">💾 Guardar sesión</button><button class="btn" onclick="current=null;document.getElementById('session').innerHTML=''">Cancelar</button></div></div>`;
+ <div class="actions"><button class="btn primary" onclick="saveSession()">💾 Guardar sesión</button><button class="btn" onclick="cancelSession()">Cancelar</button></div></div>`;
 }
+
+function cancelSession(){
+ current=null;
+ document.getElementById('session').innerHTML='';
+}
+
 function copyPrevious(i){
  const prev=previousForExercise(current.exercises[i].name);
  if(!prev)return;
  current.exercises[i].sets=prev.sets.map(x=>({weight:x.weight||'',reps:x.reps||''}));
  renderSession();
 }
-function addSet(i){current.exercises[i].sets.push({weight:'',reps:''});renderSession()}
-function removeSet(i,j){if(current.exercises[i].sets.length>1)current.exercises[i].sets.splice(j,1);renderSession()}
-function saveSession(){
- data.push(current);localStorage.setItem(KEY,JSON.stringify(data)); current=null;
- document.getElementById('session').innerHTML=`<div class="card"><h3>✅ Sesión guardada</h3><div class="small">Queda registrada con la fecha de hoy.</div></div>`;
+
+function addSet(i){
+ current.exercises[i].sets.push({weight:'',reps:''});
+ renderSession();
 }
+
+function removeSet(i,j){
+ if(current.exercises[i].sets.length>1)current.exercises[i].sets.splice(j,1);
+ renderSession();
+}
+
+function saveSession(){
+ data.push(current);
+ persistData();
+ current=null;
+ document.getElementById('session').innerHTML='<div class="card"><h3>✅ Sesión guardada</h3><div class="small">Registrada correctamente.</div></div>';
+}
+
+function renderRoutineManager(){
+ const el=document.getElementById('routineManager');
+ el.innerHTML=['A','B'].map(type=>{
+  const title=type==='A'?'🟢 Empuje + Cuádriceps':'🔵 Tirón + Posterior + Abs';
+  return `<div class="card"><h3>${title}</h3>
+  ${routines[type].map((x,i)=>`<div class="exercise">
+   <div class="small">Ejercicio ${i+1}</div>
+   <div class="manage">
+    <input type="text" value="${escapeAttr(x[0])}" aria-label="Nombre del ejercicio" onchange="renameExercise('${type}',${i},this.value)">
+    <input type="text" value="${escapeAttr(x[1])}" aria-label="Series y repeticiones objetivo" onchange="changeTarget('${type}',${i},this.value)" placeholder="4 × 6-8">
+   </div>
+   <div class="actions">
+    <button class="btn danger" onclick="deleteExercise('${type}',${i})">🗑️ Borrar ejercicio</button>
+   </div>
+  </div>`).join('')}
+  </div>`;
+ }).join('');
+}
+
+function renameExercise(type,index,value){
+ value=value.trim();
+ if(!value){alert('El nombre no puede quedar vacío.');renderRoutineManager();return}
+ routines[type][index][0]=value;
+ persistRoutines();
+ renderRoutineManager();
+}
+
+function changeTarget(type,index,value){
+ value=value.trim()||'';
+ routines[type][index][1]=value;
+ persistRoutines();
+ renderRoutineManager();
+}
+
+function deleteExercise(type,index){
+ const name=routines[type][index][0];
+ if(!confirm('¿Borrar "'+name+'"? Esto lo quitará de las próximas sesiones, pero no borrará sesiones antiguas del historial.'))return;
+ routines[type].splice(index,1);
+ persistRoutines();
+ renderRoutineManager();
+}
+
+function addExercise(type){
+ const name=prompt('Nombre del nuevo ejercicio:');
+ if(!name||!name.trim())return;
+ const target=prompt('Series y repeticiones objetivo (por ejemplo 3 × 8-12):','3 × 8-12');
+ routines[type].push([name.trim(),(target||'').trim()]);
+ persistRoutines();
+ renderRoutineManager();
+}
+
+function restoreDefaults(){
+ if(!confirm('¿Restaurar los ejercicios originales? Tus sesiones del historial NO se borrarán.'))return;
+ routines=cloneDefaults();
+ persistRoutines();
+ renderRoutineManager();
+}
+
 function deleteSession(id){
- if(!confirm('¿Borrar esta sesión?')) return;
+ if(!confirm('¿Borrar esta sesión?'))return;
  data=data.filter(s=>s.id!==id);
- localStorage.setItem(KEY,JSON.stringify(data));
+ persistData();
  renderHistory();
  setupStats();
 }
+
 function deleteAllHistory(){
  if(!data.length)return;
  if(!confirm('¿Borrar TODO el historial? Esta acción no se puede deshacer.'))return;
  data=[];
- localStorage.setItem(KEY,JSON.stringify(data));
+ persistData();
  renderHistory();
  setupStats();
+ updateInfo();
 }
+
 function renderHistory(){
  const el=document.getElementById('historyList');
- if(!data.length){el.innerHTML='<p class="muted">Todavía no hay sesiones guardadas.</p>';return}
- el.innerHTML=`<div class="actions" style="margin-bottom:10px"><button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo el historial</button></div>`+data.slice().reverse().map(s=>`<div class="history-item"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><strong>${fmt(s.date)} — ${s.type==='A'?'Empuje + Cuádriceps':'Tirón + Posterior + Abs'}</strong><div class="small">${s.exercises.map(e=>{let r=e.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+'kg × ':'')+x.reps).join(', ');return r?e.name+': '+r:''}).filter(Boolean).join(' · ')}</div></div><button class="btn danger" onclick="deleteSession(${s.id})">🗑️</button></div></div>`).join('');
+ if(!data.length){
+  el.innerHTML='<p class="small">Todavía no hay sesiones guardadas.</p>';
+  return;
+ }
+ el.innerHTML='<div class="actions"><button class="btn danger" onclick="deleteAllHistory()">🗑️ Borrar todo</button></div>'+
+ data.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id).map(s=>
+ `<div class="history-item"><div class="history-head"><div>
+ <strong>${fmt(s.date)} — ${s.type==='A'?'Empuje + Cuádriceps':'Tirón + Posterior + Abs'}</strong>
+ <div>${s.exercises.map(e=>{
+   const r=e.sets.filter(x=>x.reps).map(x=>(x.weight?x.weight+'kg × ':'')+x.reps).join(', ');
+   return r?`<span class="pill">${escapeHtml(e.name)}: ${escapeHtml(r)}</span>`:'';
+ }).filter(Boolean).join('')}</div></div>
+ <button class="btn danger" onclick="deleteSession(${s.id})">×</button></div></div>`).join('');
 }
+
 function setupStats(){
  const names=[...new Set(data.flatMap(s=>s.exercises.map(e=>e.name)))];
- const sel=document.getElementById('statExercise'); const old=sel.value;
- sel.innerHTML=names.map(n=>`<option>${n}</option>`).join(''); if(old&&names.includes(old))sel.value=old;
+ const sel=document.getElementById('statExercise');
+ const old=sel.value;
+ sel.innerHTML=names.map(n=>`<option>${escapeHtml(n)}</option>`).join('');
+ if(old&&names.includes(old))sel.value=old;
  drawChart();
 }
+
 function drawChart(){
- const canvas=document.getElementById('chart'),ctx=canvas.getContext('2d'),sel=document.getElementById('statExercise');
- ctx.clearRect(0,0,canvas.width,canvas.height);
- if(!sel.value){document.getElementById('best').textContent='Guarda alguna sesión para ver estadísticas.';return}
+ const c=document.getElementById('chart'),ctx=c.getContext('2d'),sel=document.getElementById('statExercise');
+ ctx.clearRect(0,0,c.width,c.height);
+ if(!sel.value){
+  document.getElementById('best').textContent='Guarda sesiones para ver la progresión.';
+  return;
+ }
  const pts=[];
- data.forEach(s=>{const e=s.exercises.find(x=>x.name===sel.value);if(!e)return; const vals=e.sets.map(x=>parseFloat(x.reps)).filter(Number.isFinite); if(vals.length)pts.push({date:s.date,v:Math.max(...vals)})});
- if(!pts.length){document.getElementById('best').textContent='Aún no hay repeticiones registradas para este ejercicio.';return}
- const max=Math.max(...pts.map(p=>p.v)), min=Math.min(...pts.map(p=>p.v)), pad=35,w=canvas.width-pad*2,h=canvas.height-pad*2;
- ctx.strokeStyle='#d1d5db';ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,pad+h);ctx.lineTo(pad+w,pad+h);ctx.stroke();
- ctx.beginPath();pts.forEach((p,i)=>{const x=pad+(i/(Math.max(1,pts.length-1)))*w,y=pad+h-((p.v-min)/(Math.max(1,max-min)))*h;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y)});ctx.stroke();
- pts.forEach((p,i)=>{const x=pad+(i/(Math.max(1,pts.length-1)))*w,y=pad+h-((p.v-min)/(Math.max(1,max-min)))*h;ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();});
- document.getElementById('best').textContent=`Mejor registro de repeticiones en una serie: ${max}. Sesiones registradas: ${pts.length}.`;
+ data.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(s=>{
+  const e=s.exercises.find(x=>x.name===sel.value);
+  if(!e)return;
+  const vals=e.sets.map(x=>parseFloat(x.reps)).filter(Number.isFinite);
+  if(vals.length)pts.push({v:Math.max(...vals),date:s.date});
+ });
+ if(!pts.length){
+  document.getElementById('best').textContent='No hay repeticiones registradas.';
+  return;
+ }
+ const max=Math.max(...pts.map(p=>p.v)),min=Math.min(...pts.map(p=>p.v)),pad=35,w=c.width-pad*2,h=c.height-pad*2;
+ ctx.strokeStyle='#d1d5db';
+ ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,pad+h);ctx.lineTo(pad+w,pad+h);ctx.stroke();
+ ctx.beginPath();
+ pts.forEach((p,i)=>{
+  const x=pad+i/Math.max(1,pts.length-1)*w,y=pad+h-(p.v-min)/Math.max(1,max-min)*h;
+  i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+ });
+ ctx.stroke();
+ pts.forEach((p,i)=>{
+  const x=pad+i/Math.max(1,pts.length-1)*w,y=pad+h-(p.v-min)/Math.max(1,max-min)*h;
+  ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fill();
+ });
+ document.getElementById('best').textContent=`Mejor serie: ${max} repeticiones · Registros: ${pts.length}`;
 }
+
+function startTimer(){
+ stopTimer();
+ let left=parseInt(document.getElementById('restSelect').value);
+ const box=document.createElement('div');
+ box.className='card';box.id='timerBox';
+ box.innerHTML='<h3>⏱️ Descanso</h3><div class="timer" id="timerNum"></div><div class="timerbar"><div id="timerBar"></div></div><div class="actions"><button class="btn danger" onclick="stopTimer()">Parar</button></div>';
+ document.body.appendChild(box);
+ const total=left;
+ function tick(){
+  const n=document.getElementById('timerNum');
+  const bar=document.getElementById('timerBar');
+  if(!n)return;
+  n.textContent=left+' s';
+  bar.style.width=(left/total*100)+'%';
+  if(left<=0){
+   clearInterval(timer);
+   navigator.vibrate?.([300,100,300]);
+   n.textContent='¡Listo!';
+   return;
+  }
+  left--;
+ }
+ tick();timer=setInterval(tick,1000);
+}
+
+function stopTimer(){
+ clearInterval(timer);
+ document.getElementById('timerBox')?.remove();
+}
+
+function exportData(){
+ const payload={
+  version:3,
+  exported:new Date().toISOString(),
+  data:data,
+  routines:routines
+ };
+ const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);
+ a.download='mi-rutina-copia.json';
+ a.click();
+ URL.revokeObjectURL(a.href);
+}
+
+function importData(e){
+ const f=e.target.files[0];
+ if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{
+  try{
+   const x=JSON.parse(r.result);
+   if(!Array.isArray(x.data))throw Error();
+   if(!confirm('¿Reemplazar el historial y los ejercicios actuales por la copia?'))return;
+   data=x.data;
+   if(x.routines&&x.routines.A&&x.routines.B)routines=x.routines;
+   persistData();persistRoutines();
+   updateInfo();
+   alert('Copia restaurada correctamente.');
+  }catch(err){
+   alert('El archivo no es una copia válida de Mi Rutina.');
+  }
+ };
+ r.readAsText(f);
+ e.target.value='';
+}
+
+function updateInfo(){
+ document.getElementById('dataInfo').textContent=`${data.length} sesión(es) guardada(s) y ${routines.A.length+routines.B.length} ejercicios configurados en este dispositivo.`;
+}
+
+function escapeHtml(v){
+ return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function escapeAttr(v){return escapeHtml(v)}
+
 </script>
 </body>
 </html>
