@@ -65,7 +65,7 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 <button id="cPower" onclick="setCycle('power')"><span class="dot power"></span><b>Potencia</b><br></button>
 </div>
 </div>
-<div class="grid"><div class="card"><div class="label">SESIÓN</div><select id="workout" onchange="render()"></select></div><div class="card"><select id="weekSel" onchange="render()"></select></div></div>
+<div class="grid"><div class="card"><div class="label">SESIÓN</div><select id="workout" onchange="render()"></select></div><div class="card"><div class="label">PROGRESO</div><div id="dayProgress" class="big">Día 1</div></div></div>
 <div id="nextRecommendation"></div>
 <div id="session"></div>
 <div class="card" id="orderCard">
@@ -112,12 +112,12 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 
 <script>
 const KEY='miRutinaDataV1', DRAFT_KEY='draft_session', OLD_KEYS=['miRutinaData','rutinaData','workoutHistory','calistheniaData'];
-let data=[],cycle=localStorage.getItem('calCycle')||'strength',workout='Tirón',week=Number(localStorage.getItem('calWeek')||1);
+let data=[],cycle=localStorage.getItem('calCycle')||'strength',workout='Tirón A',week=Number(localStorage.getItem('calWeek')||1);
 let timerEndTime=null;
 let timerId=null,left=0,total=0,paused=false,audioCtx=null,autoTimer=localStorage.getItem('calAuto')!=='0';
 
 const C={
-  1:{
+  strength:{
     name:'Fuerza',days:24,rest:180,
     workouts:{
       'Tirón A':[
@@ -158,7 +158,7 @@ const C={
       ]
     }
   },
-  2:{
+  hypertrophy:{
     name:'Hipertrofia',days:32,rest:120,
     workouts:{
       'Tirón A':[
@@ -200,7 +200,7 @@ const C={
       ]
     }
   },
-  3:{
+  power:{
     name:'Potencia',days:16,rest:150,
     workouts:{
       'Tirón A':[
@@ -257,19 +257,11 @@ data=load(); localStorage.setItem(KEY,JSON.stringify(data));
 document.getElementById('today').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
 function tab(id,b){document.querySelectorAll('main section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(id==='stats')stats();if(id==='history')history()}
 
-function setCycle(c){cycle=c;week=1;workout=Object.keys(C[c].workouts)[0];localStorage.setItem('calCycle',c);localStorage.setItem('calWeek',week);render()}
-function cycleNotice(){const el=document.getElementById('cycleAlert');if(!el)return;const c=C[cycle];if(week>=c.days){const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;el.classList.remove('hidden');el.innerHTML=`🔄 <b>ÚLTIMO DÍA DEL CICLO · ${week}/${c.days}</b><br>`; }else{el.classList.add('hidden');el.innerHTML=''}}
-function cycleCompletedNotice(){const c=C[cycle];if(week!==c.days)return;const key='cycleDone_'+cycle+'_'+week;if(localStorage.getItem(key))return;localStorage.setItem(key,'1');const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;if(confirm(`🔄 Ciclo completado\n\nHas terminado el ${c.name}.\n\nEl siguiente ciclo es ${nextName}.\n\n¿Quieres pasar ahora al siguiente ciclo?`))setCycle(next)}
-function restTime(){return Number(localStorage.getItem('rest_'+cycle)||C[cycle].rest)}
-function draftKey(){return DRAFT_KEY+'_'+today()}
-function getDraft(){try{const d=JSON.parse(localStorage.getItem(draftKey())||'null');return d&&d.workout===workout&&d.program===cycle&&d.week===week?d:null}catch{return null}}
-function saveDraft(){try{localStorage.setItem(draftKey(),JSON.stringify(collectDraft()))}catch{}}
-function clearDraft(){localStorage.removeItem(draftKey())}
-function collectDraft(){
- const ex=C[cycle].workouts[workout].map((x,i)=>{const [name,target,type]=x; if(type==='simple'||type==='accessory') return {name,target,type,done:!!document.getElementById('q'+i)?.classList.contains('done'),sets:[]};
- let sets=Array.from({length:+((target.match(/^(\d+)/)||[0,3])[1])},(_,j)=>({weight:document.getElementById(`w${i}_${j}`)?.value||'',reps:document.getElementById(`r${i}_${j}`)?.value||'',done:!!document.getElementById(`s${i}_${j}`)?.classList.contains('done')}));
- return {name,target,type,sets};});
- return {date:today(),program:cycle,workout,week,exercises:ex};
+function setCycle(c){
+  cycle=c;
+  workout=Object.keys(C[c].workouts)[0];
+  localStorage.setItem('calCycle',c);
+  render();
 }
 
 const ORDER_KEY='calExerciseOrders';
@@ -333,8 +325,7 @@ function resetExerciseOrder(){
 
 function completedCycleSessions(){
   try{
-    const all=JSON.parse(localStorage.getItem('sessions')||'[]')||[];
-    return all.filter(s=>s.cycle===cycle).length;
+    return data.filter(s=>s && (s.program===cycle || s.cycle===cycle)).length;
   }catch{return 0}
 }
 function recommendedWorkout(){
@@ -377,10 +368,10 @@ function showWorkoutChoices(){
 
 function render(){
   renderRecommendation();
- const c=C[cycle];document.getElementById('cycleTitle').textContent=c.name;document.getElementById('week').textContent=`Semana ${week} de ${c.days}`;cycleNotice();
+ const c=C[cycle];document.getElementById('cycleTitle').textContent=c.name;document.getElementById('week').textContent=`Día ${Math.min(completedCycleSessions()+1,c.days)} de ${c.days}`;cycleNotice();
  ['strength','hypertrophy','power'].forEach(x=>document.getElementById('c'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===cycle));
- document.getElementById('workout').innerHTML=Object.keys(c.workouts).map(x=>`<option>${x}</option>`).join('');document.getElementById('workout').value=workout;
- document.getElementById('weekSel').innerHTML=Array.from({length:c.days},(_,i)=>`<option value="${i+1}">Semana ${i+1}</option>`).join('');document.getElementById('weekSel').value=week;
+ document.getElementById('workout').innerHTML=Object.keys(c.workouts).map(x=>`<option>${x}</option>`).join('');if(!c.workouts[workout])workout=Object.keys(c.workouts)[0];document.getElementById('workout').value=workout;
+ document.getElementById('dayProgress').textContent=`Día ${Math.min(completedCycleSessions()+1,c.days)} / ${c.days}`;
  document.getElementById('session').innerHTML=orderedExercises().map((x,i)=>exerciseHTML(x,i)).join(''); renderExerciseOrder();
  const d=getDraft();
  if(d){ const old=document.getElementById('draftNotice'); if(old)old.remove(); const n=document.createElement('div'); n.id='draftNotice'; n.className='card'; n.style.borderColor='#1597ff'; n.innerHTML='<b>↻ Borrador recuperado</b><br><span class="small">Hemos recuperado el entrenamiento de hoy que estabas realizando.</span> <button class="ghost" style="margin-top:8px" onclick="clearDraft();render()">Descartar borrador</button>'; document.getElementById('session').prepend(n); }
@@ -394,12 +385,12 @@ function handstandProgression(c,w){
  if(c==='strength'){
   if(week<=2)return {name:'Flexiones a pino',target:'4 × 6-8',note:'Base de fuerza: pies elevados, rango completo y controlado.'};
   if(week<=4)return {name:'Flexiones a pino · Negativas',target:'4 × 3-5',note:'Bajada lenta de 3-5 s desde el pino contra pared.'};
-  return {name:'Flexiones a pino · ROM parcial',target:'4 × 2-4',note:'Trabaja cada vez más rango; termina con negativa si no completas la repetición.'};
+  return {name:'Flexiones a pino',target:'4 × 4-6',note:'Rango completo y controlado.'};
  }
  if(c==='hypertrophy'){
   if(week<=2)return {name:'Flexiones a pino',target:'3 × 8-12',note:'Volumen con pies elevados y rango completo.'};
   if(week<=4)return {name:'Flexiones a pino alta',target:'3 × 8-12',note:'Eleva más los pies para acercar el ángulo al pino.'};
-  if(week<=6)return {name:'Flexiones a pino · ROM parcial',target:'3 × 5-8',note:'Más rango en cada semana, manteniendo control.'};
+  if(week<=6)return {name:'Flexiones a pino alta',target:'3 × 8-12',note:'Rango completo y controlado.'};
   return {name:'Flexiones a pino · Asistidas',target:'3 × 4-8',note:'Contra pared con la mínima asistencia necesaria.'};
  }
  if(week===1)return {name:'Flexiones a pino · Pike explosiva',target:'4 × 4-6',note:'Subida explosiva, sin llegar al fallo.'};
@@ -408,7 +399,7 @@ function handstandProgression(c,w){
 }
 
 function suggestion(name,code,target,i){
- const p=previous(name),n=nums(p);if(!p||!n.length||!['pullup','chinup','dip'].includes(code))return '';
+ const p=previous(name),n=nums(p);if(!p||!n.length||!['pullup_weighted','chinup_weighted','dip_weighted'].includes(code))return '';
  const max=targetMax(target), weights=n.map(x=>x.w).filter(Number.isFinite), last=weights.length?Math.max(...weights):0;
  if(max&&n.length>=2&&n.every(x=>x.r>=max)&&last!==undefined)return `<div class="suggest"><b>↗ Sugerencia para hoy: +${last+2.5} kg</b><br><span class="small">Completaste el máximo del rango anterior.</span><br><button class="primary" style="margin-top:7px" onclick="suggestLoad(${i},${last+2.5})">Usar +${last+2.5} kg</button></div>`;
  if(last)return `<div class="last"><b>Mantener +${last} kg</b><br><span class="small">Última sesión no completó todo el rango.</span></div>`;
@@ -419,7 +410,7 @@ const bodyweight_names=new Set(["Dominadas explosivas","Dominadas explosivas al 
 function exerciseHTML(x,i){
  let [name,target,type,code]=x;
  const draft=getDraft();
- const hs=code==='handstand'?handstandProgression(cycle,week):null;
+ const hs=code==='handstand'?handstandProgression(cycle,cycleDay()):null;
  if(hs){name=hs.name;target=hs.target;}
  const de=draft?.exercises?.[i];
  if(type==='simple')return `<div class="simple"><b>${name==='Pierna'?'🦵':'▣'} ${name}</b><button id="q${i}" class="${de?.done?'done':''}" onclick="simpleDone(${i})">${de?.done?'✓':'☐'}</button></div>`;
@@ -442,7 +433,7 @@ function finishSet(i,j,count){
 function collect(){
  const ex=C[cycle].workouts[workout].map((x,i)=>{let [name,target,type]=x;if(type==='simple'||type==='accessory'){return{name,target,type,done:document.getElementById('q'+i)?.classList.contains('done'),sets:[]}}
  let sets=Array.from(document.querySelectorAll(`[id^="w${i}_"]`)).filter(e=>e.id.startsWith('w'+i+'_')).map((_,j)=>({weight:document.getElementById(`w${i}_${j}`)?.value||'',reps:document.getElementById(`r${i}_${j}`)?.value||''}));return{name,target,type,sets,done:sets.some(s=>s.reps)} });
- return {id:Date.now(),date:today(),program:cycle,workout,week,exercises:ex,routineName:C[cycle].name}
+ return {id:Date.now(),date:today(),program:cycle,workout,exercises:ex,routineName:C[cycle].name}
 }
 function saveSession(){let s=collect();if(!s.exercises.some(e=>e.done)){alert('Registra al menos una parte del entrenamiento.');return}data.push(s);localStorage.setItem(KEY,JSON.stringify(data));clearDraft();alert('Sesión guardada ✓');stats();cycleCompletedNotice()}
 function history(){
@@ -472,42 +463,86 @@ function playAlarm(){
  if(mode==='ring')setTimeout(()=>playBeep2(vol),190)
 }
 function playBeep2(vol){if(!audioCtx)return;let o=audioCtx.createOscillator(),g=audioCtx.createGain(),n=audioCtx.currentTime;o.frequency.value=1175;g.gain.setValueAtTime(.0001,n);g.gain.exponentialRampToValueAtTime(.25*vol,n+.02);g.gain.exponentialRampToValueAtTime(.0001,n+.3);o.connect(g).connect(audioCtx.destination);o.start(n);o.stop(n+.32)}
-function startTimer(sec){
+function updateTimerDisplay(){
+  paintTimer();
+}
+function playRestAlarm(){
+  playAlarm();
+}
+function startTimer(sec,title='Siguiente serie'){
   clearInterval(timerId);
-  const endTime = Date.now() + sec * 1000;
-  timerEndTime = endTime;
-  left = sec;
+  paused=false;
+  total=Number(sec)||0;
+  left=total;
+  timerEndTime=Date.now()+total*1000;
+  document.getElementById('timerTitle').textContent=title;
+  document.getElementById('timer').classList.remove('hidden');
   updateTimerDisplay();
-  timerId = setInterval(() => {
-    left = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+  timerId=setInterval(()=>{
+    if(paused)return;
+    left=Math.max(0,Math.ceil((timerEndTime-Date.now())/1000));
     updateTimerDisplay();
-    if (left <= 0) {
+    if(left<=0){
       clearInterval(timerId);
-      timerId = null;
-      timerEndTime = null;
+      timerId=null;
+      timerEndTime=null;
       playRestAlarm();
     }
-  }, 250);
+  },250);
 }
-function paintTimer(){let m=Math.floor(left/60),s=left%60;document.getElementById('timerNum').textContent=`${m}:${String(s).padStart(2,'0')}`;document.getElementById('timerSub').textContent=`de ${Math.floor(total/60)}:${String(total%60).padStart(2,'0')}`;document.getElementById('timerRing').style.setProperty('--pct',`${total?left/total*360:0}deg`)}
-function pauseTimer(){paused=!paused}
-function add30(){left+=30;total=Math.max(total,left);paintTimer()}
-function skipTimer(){clearInterval(timerId);closeTimer()}
-function closeTimer(){clearInterval(timerId);document.getElementById('timer').classList.add('hidden')}
+function paintTimer(){
+  const m=Math.floor(left/60),s=left%60;
+  document.getElementById('timerNum').textContent=`${m}:${String(s).padStart(2,'0')}`;
+  document.getElementById('timerSub').textContent=`de ${Math.floor(total/60)}:${String(total%60).padStart(2,'0')}`;
+  document.getElementById('timerRing').style.setProperty('--pct',`${total?left/total*360:0}deg`);
+}
+function pauseTimer(){
+  if(!timerId && !timerEndTime)return;
+  if(!paused){
+    left=Math.max(0,Math.ceil((timerEndTime-Date.now())/1000));
+    paused=true;
+    timerEndTime=null;
+  }else{
+    timerEndTime=Date.now()+left*1000;
+    paused=false;
+  }
+  updateTimerDisplay();
+}
+function add30(){
+  if(paused)left+=30;
+  else if(timerEndTime)timerEndTime+=30000;
+  else left+=30;
+  total=Math.max(total,left);
+  updateTimerDisplay();
+}
+function skipTimer(){
+  clearInterval(timerId);
+  timerId=null;
+  timerEndTime=null;
+  closeTimer();
+}
+function closeTimer(){
+  clearInterval(timerId);
+  timerId=null;
+  timerEndTime=null;
+  paused=false;
+  document.getElementById('timer').classList.add('hidden');
+}
 function exportData(){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='calisthenia-backup.json';a.click()}
 function importData(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(Array.isArray(x)){data=x;localStorage.setItem(KEY,JSON.stringify(data));history();stats();alert('Datos importados ✓')}}catch{alert('Archivo no válido')}};r.readAsText(f)}
-document.getElementById('workout').onchange=()=>{workout=document.getElementById('workout').value;render()};document.getElementById('weekSel').onchange=()=>{week=+document.getElementById('weekSel').value;localStorage.setItem('calWeek',week);render()};
+document.getElementById('workout').onchange=()=>{workout=document.getElementById('workout').value;render()};localStorage.setItem('calWeek',week);render()};
 ['restStrength','restHyp','restPower'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{let c=id==='restStrength'?'strength':id==='restHyp'?'hypertrophy':'power';localStorage.setItem('rest_'+c,document.getElementById(id).value)}));
 window.addEventListener('beforeunload',()=>{try{if(document.getElementById('session') && collectDraft().exercises.some(e=>e.done||e.sets?.some(s=>s.reps||s.weight)))saveDraft()}catch{}});
 render();
-</script>
-</body>
-</html>
-<script>
 document.addEventListener('visibilitychange',()=>{
-  if(timerEndTime){
-    left=Math.max(0,Math.round((timerEndTime-Date.now())/1000));
-    if(typeof updateTimerDisplay==='function') updateTimerDisplay();
+  if(timerEndTime && !paused){
+    left=Math.max(0,Math.ceil((timerEndTime-Date.now())/1000));
+    updateTimerDisplay();
+    if(left<=0){
+      clearInterval(timerId);timerId=null;timerEndTime=null;playRestAlarm();
+    }
   }
 });
 </script>
+</body>
+</html>
