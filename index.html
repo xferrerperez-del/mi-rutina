@@ -337,6 +337,75 @@ function recommendedWorkout(){
 function cycleDay(){
   return Math.min(completedCycleSessions()+1, C[cycle].days||completedCycleSessions()+1);
 }
+
+function getDraft(){
+  try{
+    const d=JSON.parse(localStorage.getItem(DRAFT_KEY)||'null');
+    if(!d || d.date!==today() || d.program!==cycle || d.workout!==workout) return null;
+    return d;
+  }catch{return null}
+}
+function collectDraft(){
+  const original=orderedExercises();
+  const ex=original.map((x,i)=>{
+    const [name,target,type]=x;
+    if(type==='simple'||type==='accessory'){
+      return {name,target,type,done:document.getElementById('q'+i)?.classList.contains('done'),sets:[]};
+    }
+    const sets=[];
+    const count=Number((String(target).match(/^(\d+)/)||[1,3])[1]);
+    for(let j=0;j<count;j++){
+      const w=document.getElementById(`w${i}_${j}`)?.value||'';
+      const r=document.getElementById(`r${i}_${j}`)?.value||'';
+      const done=document.getElementById(`s${i}_${j}`)?.classList.contains('done')||false;
+      sets.push({weight:w,reps:r,done});
+    }
+    return {name,target,type,sets,done:sets.some(s=>s.done||s.reps)};
+  });
+  return {date:today(),program:cycle,workout,exercises:ex};
+}
+function saveDraft(){
+  try{
+    localStorage.setItem(DRAFT_KEY,JSON.stringify(collectDraft()));
+  }catch{}
+}
+function clearDraft(){
+  localStorage.removeItem(DRAFT_KEY);
+}
+function cycleNotice(){
+  const el=document.getElementById('cycleAlert');
+  if(!el)return;
+  const c=C[cycle], done=completedCycleSessions(), total=c.days;
+  if(done>=total){
+    const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';
+    el.classList.remove('hidden');
+    el.innerHTML=`🔄 <b>CICLO COMPLETADO · ${done}/${total} sesiones</b><br>
+      Has completado ${esc(c.name)}. <button onclick="setCycle('${next}')">Pasar a ${esc(C[next].name)}</button>`;
+  }else if(done===total-1){
+    el.classList.remove('hidden');
+    el.innerHTML=`🔔 <b>ÚLTIMA SESIÓN DEL CICLO · ${done+1}/${total}</b>`;
+  }else{
+    el.classList.add('hidden');
+    el.innerHTML='';
+  }
+}
+function cycleCompletedNotice(){
+  const c=C[cycle],done=completedCycleSessions();
+  if(done!==c.days)return;
+  const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';
+  const key='cycleDone_'+cycle+'_'+done;
+  if(localStorage.getItem(key))return;
+  localStorage.setItem(key,'1');
+  if(confirm(`Ciclo ${c.name} completado (${done}/${c.days} sesiones). ¿Quieres pasar a ${C[next].name}?`)){
+    setCycle(next);
+  }
+}
+function restTime(){
+  const key='rest_'+cycle;
+  const saved=Number(localStorage.getItem(key));
+  return Number.isFinite(saved)&&saved>0?saved:C[cycle].rest;
+}
+
 function renderRecommendation(){
   const box=document.getElementById('nextRecommendation');
   if(!box)return;
@@ -380,23 +449,7 @@ function previous(name){
  for(let i=data.length-1;i>=0;i--){let e=(data[i].exercises||[]).find(x=>x.name===name);if(e)return e}return null
 }
 function targetMax(t){let m=String(t).match(/(\d+)\s*[–-]\s*(\d+)/);return m?+m[2]:null}
-function handstandProgression(c,w){
- const week=Number(w)||1;
- if(c==='strength'){
-  if(week<=2)return {name:'Flexiones a pino',target:'4 × 6-8',note:'Base de fuerza: pies elevados, rango completo y controlado.'};
-  if(week<=4)return {name:'Flexiones a pino · Negativas',target:'4 × 3-5',note:'Bajada lenta de 3-5 s desde el pino contra pared.'};
-  return {name:'Flexiones a pino',target:'4 × 4-6',note:'Rango completo y controlado.'};
- }
- if(c==='hypertrophy'){
-  if(week<=2)return {name:'Flexiones a pino',target:'3 × 8-12',note:'Volumen con pies elevados y rango completo.'};
-  if(week<=4)return {name:'Flexiones a pino alta',target:'3 × 8-12',note:'Eleva más los pies para acercar el ángulo al pino.'};
-  if(week<=6)return {name:'Flexiones a pino alta',target:'3 × 8-12',note:'Rango completo y controlado.'};
-  return {name:'Flexiones a pino · Asistidas',target:'3 × 4-8',note:'Contra pared con la mínima asistencia necesaria.'};
- }
- if(week===1)return {name:'Flexiones a pino · Pike explosiva',target:'4 × 4-6',note:'Subida explosiva, sin llegar al fallo.'};
- if(week<=3)return {name:'Flexiones a pino · Asistida explosiva',target:'4 × 3-5',note:'Ayuda mínima y máxima velocidad en la subida.'};
- return {name:'Flexiones a pino · Intentos técnicos',target:'4 × 2-4',note:'Repeticiones rápidas y limpias; para antes de perder velocidad.'};
-}
+function handstandProgression(c,w){return null;}
 
 function suggestion(name,code,target,i){
  const p=previous(name),n=nums(p);if(!p||!n.length||!['pullup_weighted','chinup_weighted','dip_weighted'].includes(code))return '';
@@ -410,7 +463,7 @@ const bodyweight_names=new Set(["Dominadas explosivas","Dominadas explosivas al 
 function exerciseHTML(x,i){
  let [name,target,type,code]=x;
  const draft=getDraft();
- const hs=code==='handstand'?handstandProgression(cycle,cycleDay()):null;
+ const hs=null;
  if(hs){name=hs.name;target=hs.target;}
  const de=draft?.exercises?.[i];
  if(type==='simple')return `<div class="simple"><b>${name==='Pierna'?'🦵':'▣'} ${name}</b><button id="q${i}" class="${de?.done?'done':''}" onclick="simpleDone(${i})">${de?.done?'✓':'☐'}</button></div>`;
@@ -431,9 +484,20 @@ function finishSet(i,j,count){
  initAudio(); if(autoTimer && j<count-1)startTimer(restTime(),'Siguiente serie');
 }
 function collect(){
- const ex=C[cycle].workouts[workout].map((x,i)=>{let [name,target,type]=x;if(type==='simple'||type==='accessory'){return{name,target,type,done:document.getElementById('q'+i)?.classList.contains('done'),sets:[]}}
- let sets=Array.from(document.querySelectorAll(`[id^="w${i}_"]`)).filter(e=>e.id.startsWith('w'+i+'_')).map((_,j)=>({weight:document.getElementById(`w${i}_${j}`)?.value||'',reps:document.getElementById(`r${i}_${j}`)?.value||''}));return{name,target,type,sets,done:sets.some(s=>s.reps)} });
- return {id:Date.now(),date:today(),program:cycle,workout,exercises:ex,routineName:C[cycle].name}
+  const ex=orderedExercises().map((x,i)=>{
+    let [name,target,type]=x;
+    if(type==='simple'||type==='accessory'){
+      return {name,target,type,done:document.getElementById('q'+i)?.classList.contains('done'),sets:[]};
+    }
+    const count=Number((String(target).match(/^(\d+)/)||[1,3])[1]);
+    const sets=Array.from({length:count},(_,j)=>({
+      weight:document.getElementById(`w${i}_${j}`)?.value||'',
+      reps:document.getElementById(`r${i}_${j}`)?.value||'',
+      done:document.getElementById(`s${i}_${j}`)?.classList.contains('done')||false
+    }));
+    return {name,target,type,sets,done:sets.some(s=>s.done||s.reps)};
+  });
+  return {id:Date.now(),date:today(),program:cycle,workout,exercises:ex,routineName:C[cycle].name};
 }
 function saveSession(){let s=collect();if(!s.exercises.some(e=>e.done)){alert('Registra al menos una parte del entrenamiento.');return}data.push(s);localStorage.setItem(KEY,JSON.stringify(data));clearDraft();alert('Sesión guardada ✓');stats();cycleCompletedNotice()}
 function history(){
@@ -530,7 +594,7 @@ function closeTimer(){
 }
 function exportData(){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='calisthenia-backup.json';a.click()}
 function importData(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(Array.isArray(x)){data=x;localStorage.setItem(KEY,JSON.stringify(data));history();stats();alert('Datos importados ✓')}}catch{alert('Archivo no válido')}};r.readAsText(f)}
-document.getElementById('workout').onchange=()=>{workout=document.getElementById('workout').value;render()};localStorage.setItem('calWeek',week);render()};
+document.getElementById('workout').onchange=()=>{workout=document.getElementById('workout').value;render()};render();
 ['restStrength','restHyp','restPower'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{let c=id==='restStrength'?'strength':id==='restHyp'?'hypertrophy':'power';localStorage.setItem('rest_'+c,document.getElementById(id).value)}));
 window.addEventListener('beforeunload',()=>{try{if(document.getElementById('session') && collectDraft().exercises.some(e=>e.done||e.sets?.some(s=>s.reps||s.weight)))saveDraft()}catch{}});
 render();
