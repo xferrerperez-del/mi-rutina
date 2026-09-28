@@ -36,6 +36,10 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 
 .sets.bodyweight{grid-template-columns:30px 1fr 38px}
 .sets.weighted{grid-template-columns:30px 1fr 1fr 38px}
+
+.rec-card{margin-bottom:14px}
+.rec-title{font-size:22px;font-weight:800;margin:5px 0}
+.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700}
 </style>
 </head>
 <body>
@@ -56,12 +60,13 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 <div class="card hero">
 <div class="row"><div><div class="small">CICLO ACTUAL</div><h2 id="cycleTitle" style="margin:4px 0"></h2><div id="week" class="muted"></div><div id="cycleAlert" class="cycleAlert hidden"></div></div><button class="ghost" onclick="saveSession()">Guardar</button></div>
 <div class="cycle" style="margin-top:14px">
-<button id="cStrength" onclick="setCycle('strength')"><span class="dot strength"></span><b>Fuerza</b><br><span class="small">6 semanas</span></button>
-<button id="cHypertrophy" onclick="setCycle('hypertrophy')"><span class="dot hypertrophy"></span><b>Hipertrofia</b><br><span class="small">8 semanas</span></button>
-<button id="cPower" onclick="setCycle('power')"><span class="dot power"></span><b>Potencia</b><br><span class="small">4 semanas</span></button>
+<button id="cStrength" onclick="setCycle('strength')"><span class="dot strength"></span><b>Fuerza</b><br></button>
+<button id="cHypertrophy" onclick="setCycle('hypertrophy')"><span class="dot hypertrophy"></span><b>Hipertrofia</b><br></button>
+<button id="cPower" onclick="setCycle('power')"><span class="dot power"></span><b>Potencia</b><br></button>
 </div>
 </div>
-<div class="grid"><div class="card"><div class="label">SESIÓN</div><select id="workout" onchange="render()"></select></div><div class="card"><div class="label">SEMANA</div><select id="weekSel" onchange="render()"></select></div></div>
+<div class="grid"><div class="card"><div class="label">SESIÓN</div><select id="workout" onchange="render()"></select></div><div class="card"><select id="weekSel" onchange="render()"></select></div></div>
+<div id="nextRecommendation"></div>
 <div id="session"></div>
 <div class="card" id="orderCard">
   <div class="row">
@@ -107,25 +112,134 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 
 <script>
 const KEY='miRutinaDataV1', DRAFT_KEY='draft_session', OLD_KEYS=['miRutinaData','rutinaData','workoutHistory','calistheniaData'];
-let data=[],cycle=localStorage.getItem('calCycle')||'strength',workout='Tirón A',week=Number(localStorage.getItem('calWeek')||1);
+let data=[],cycle=localStorage.getItem('calCycle')||'strength',workout='Tirón',week=Number(localStorage.getItem('calWeek')||1);
 let timerId=null,left=0,total=0,paused=false,audioCtx=null,autoTimer=localStorage.getItem('calAuto')!=='0';
 
 const C={
-strength:{name:'Ciclo 1 · Fuerza',weeks:6,rest:180,workouts:{
-'Tirón A':[['Dominadas lastradas','4 × 4-6','main','pullup'],['Dominadas supinas lastradas','3 × 5-6','main','chinup'],['Remo australiano','3 × 8-12','accessory'],['Curl bíceps','3 × 8-12','accessory'],['Face Pull','3 × 12-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Empuje A':[['Pino / progresión','4 series','main','handstand'],['Pike push-up elevada','3 × 6-10','main','pike'],['Fondos lastrados','4 × 4-6','main','dip'],['Pike push-up elevada','3 × 6-10','main','pike'],['Tríceps','3 × 10-15','accessory'],['Elevaciones laterales','3 × 12-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Tirón B':[['Muscle-up técnico','4 × 1-3','main','muscleup'],['Dominadas explosivas al pecho','4 × 3-5','main','explosive'],['Dominadas pronas lastradas','3 × 4-6','main','pullup'],['Curl bíceps','2-3 × 10-12','accessory'],['Face Pull','2-3 × 12-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Empuje B':[['Pino / progresión','4 series','main','handstand'],['Pike push-up elevada','3 × 6-10','main','pike'],['Fondos lastrados','3 × 5-6','main','dip'],['Flexiones en paralelas','3 × 8-12','main','pushup'],['Tríceps','3 × 10-15','accessory'],['Elevaciones laterales','3 × 12-20','accessory'],['Pierna','','simple'],['Abs','','simple']]}},
-hypertrophy:{name:'Ciclo 2 · Hipertrofia',weeks:8,rest:90,workouts:{
-'Tirón A':[['Dominadas lastradas','4 × 6-10','main','pullup'],['Dominadas supinas','3 × 8-12','main','chinup'],['Remo australiano','3 × 10-15','accessory'],['Curl bíceps','3 × 10-15','accessory'],['Face Pull','3 × 15-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Empuje A':[['Pino / progresión','3-4 series','main','handstand'],['Pike push-up elevada','3 × 8-12','main','pike'],['Fondos lastrados','4 × 6-10','main','dip'],['Pike push-up elevada','3 × 8-12','main','pike'],['Tríceps','3 × 10-15','accessory'],['Elevaciones laterales','3 × 12-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Tirón B':[['Dominadas pronas','3 × 8-12','main','pullup'],['Dominadas supinas','3 × 8-12','main','chinup'],['Muscle-up técnico','2-3 × 1-2','main','muscleup'],['Remo australiano','3 × 10-15','accessory'],['Curl bíceps','3 × 10-15','accessory'],['Face Pull','3 × 15-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Empuje B':[['Pino / progresión','3 series','main','handstand'],['Pike push-up elevada','3 × 8-12','main','pike'],['Fondos','3 × 8-12','main','dip'],['Flexiones en paralelas','3 × 10-15','main','pushup'],['Tríceps','3 × 10-15','accessory'],['Elevaciones laterales','3 × 15-20','accessory'],['Pierna','','simple'],['Abs','','simple']]}},
-power:{name:'Ciclo 3 · Potencia',weeks:4,rest:120,workouts:{
-'Tirón A':[['Dominadas explosivas al pecho','5 × 3','main','explosive'],['Muscle-up','4 × 1-2','main','muscleup'],['Dominadas lastradas','3 × 3-4','main','pullup'],['Remo australiano explosivo','3 × 5-8','accessory'],['Face Pull','2-3 × 15-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Empuje A':[['Pino / progresión','4 series','main','handstand'],['Pike push-up','3 × 5-8','main','pike'],['Fondos explosivos','4 × 3-5','main','dip'],['Flexiones explosivas','4 × 3-5','main','pushup'],['Pike push-up','3 × 5-8','main','pike'],['Elevaciones laterales','2-3 × 15-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Tirón B':[['Muscle-up','5 × 1-2','main','muscleup'],['Dominadas explosivas','5 × 3','main','explosive'],['Dominadas lastradas','3 × 3','main','pullup'],['Remo australiano','3 × 8-10','accessory'],['Face Pull','2-3 × 15-20','accessory'],['Pierna','','simple'],['Abs','','simple']],
-'Empuje B':[['Pino / progresión','4 series','main','handstand'],['Pike push-up','3 × 5-8','main','pike'],['Fondos explosivos','4 × 3-5','main','dip'],['Flexiones explosivas','3 × 4-6','main','pushup'],['Fondos normales','3 × 6-8','main','dip'],['Elevaciones laterales','2-3 × 15-20','accessory'],['Pierna','','simple'],['Abs','','simple']]}}
+  1:{
+    name:'Fuerza',days:24,rest:180,
+    workouts:{
+      'Tirón A':[
+        ['Dominadas lastradas','4 × 4-6','main','pullup_weighted'],
+        ['Dominadas supinas lastradas','3 × 5-6','main','chinup_weighted'],
+        ['Remo australiano','3 × 8-12','accessory','row'],
+        ['Curl bíceps','3 × 8-12','accessory','curl'],
+        ['Face Pull','3 × 12-20','accessory','facepull'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Tirón B':[
+        ['Muscle-up técnico','4 × 1-3','main','muscleup_tech'],
+        ['Dominadas explosivas al pecho','4 × 3-5','main','pullup_explosive_chest'],
+        ['Dominadas pronas lastradas','3 × 4-6','main','pullup_weighted'],
+        ['Curl bíceps','2-3 × 10-12','accessory','curl'],
+        ['Face Pull','2-3 × 12-20','accessory','facepull'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Empuje A':[
+        ['Flexiones a pino','4 × 4-6','main','handstand_pushup'],
+        ['Fondos lastrados','4 × 4-6','main','dip_weighted'],
+        ['Pike push-up elevada','3 × 6-10','main','pike'],
+        ['Tríceps','3 × 10-15','accessory','triceps'],
+        ['Elevaciones laterales','3 × 12-20','accessory','lateral'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Empuje B':[
+        ['Flexiones a pino','4 × 4-6','main','handstand_pushup'],
+        ['Fondos lastrados','3 × 5-6','main','dip_weighted'],
+        ['Flexiones en paralelas','3 × 8-12','accessory','pushup_parallel'],
+        ['Tríceps','3 × 10-15','accessory','triceps'],
+        ['Elevaciones laterales','3 × 12-20','accessory','lateral'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ]
+    }
+  },
+  2:{
+    name:'Hipertrofia',days:32,rest:120,
+    workouts:{
+      'Tirón A':[
+        ['Dominadas lastradas','4 × 6-10','main','pullup_weighted'],
+        ['Dominadas supinas','3 × 8-12','main','chinup'],
+        ['Remo australiano','3 × 10-15','accessory','row'],
+        ['Curl bíceps','3 × 10-15','accessory','curl'],
+        ['Face Pull','3 × 15-20','accessory','facepull'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Tirón B':[
+        ['Dominadas pronas','3 × 8-12','main','pullup'],
+        ['Dominadas supinas','3 × 8-12','main','chinup'],
+        ['Muscle-up técnico','2-3 × 1-2','main','muscleup_tech'],
+        ['Remo australiano','3 × 10-15','accessory','row'],
+        ['Curl bíceps','3 × 10-15','accessory','curl'],
+        ['Face Pull','3 × 15-20','accessory','facepull'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Empuje A':[
+        ['Flexiones a pino','3 × 6-10','main','handstand_pushup'],
+        ['Fondos lastrados','4 × 6-10','main','dip_weighted'],
+        ['Pike push-up elevada','3 × 8-12','main','pike'],
+        ['Tríceps','3 × 10-15','accessory','triceps'],
+        ['Elevaciones laterales','3 × 12-20','accessory','lateral'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Empuje B':[
+        ['Flexiones a pino','3 × 8-12','main','handstand_pushup'],
+        ['Fondos','3 × 8-12','main','dips'],
+        ['Flexiones en paralelas','3 × 10-15','accessory','pushup_parallel'],
+        ['Tríceps','3 × 10-15','accessory','triceps'],
+        ['Elevaciones laterales','3 × 15-20','accessory','lateral'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ]
+    }
+  },
+  3:{
+    name:'Potencia',days:16,rest:150,
+    workouts:{
+      'Tirón A':[
+        ['Dominadas explosivas al pecho','5 × 3','main','pullup_explosive_chest'],
+        ['Muscle-up','4 × 1-2','main','muscleup'],
+        ['Dominadas lastradas','3 × 3-4','main','pullup_weighted'],
+        ['Remo australiano explosivo','3 × 5-8','accessory','row_explosive'],
+        ['Face Pull','2-3 × 15-20','accessory','facepull'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Tirón B':[
+        ['Muscle-up','5 × 1-2','main','muscleup'],
+        ['Dominadas explosivas','5 × 3','main','pullup_explosive'],
+        ['Dominadas lastradas','3 × 3','main','pullup_weighted'],
+        ['Remo australiano explosivo','3 × 5-8','accessory','row_explosive'],
+        ['Face Pull','2-3 × 15-20','accessory','facepull'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Empuje A':[
+        ['Flexiones a pino explosivas','4 × 3-5','main','handstand_pushup_explosive'],
+        ['Fondos explosivos','4 × 3-5','main','dip_explosive'],
+        ['Flexiones explosivas','4 × 3-5','main','pushup_explosive'],
+        ['Pike push-up explosiva','3 × 5-8','main','pike_explosive'],
+        ['Elevaciones laterales','2-3 × 15-20','accessory','lateral'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ],
+      'Empuje B':[
+        ['Flexiones a pino explosivas','4 × 3-5','main','handstand_pushup_explosive'],
+        ['Fondos explosivos','4 × 3-5','main','dip_explosive'],
+        ['Flexiones explosivas','3 × 4-6','main','pushup_explosive'],
+        ['Fondos normales','3 × 6-8','main','dips'],
+        ['Elevaciones laterales','2-3 × 15-20','accessory','lateral'],
+        ['Pierna','simple','simple','leg'],
+        ['Abs','simple','simple','abs']
+      ]
+    }
+  }
 };
 
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
@@ -143,7 +257,7 @@ document.getElementById('today').textContent=new Date().toLocaleDateString('es-E
 function tab(id,b){document.querySelectorAll('main section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(id==='stats')stats();if(id==='history')history()}
 
 function setCycle(c){cycle=c;week=1;workout=Object.keys(C[c].workouts)[0];localStorage.setItem('calCycle',c);localStorage.setItem('calWeek',week);render()}
-function cycleNotice(){const el=document.getElementById('cycleAlert');if(!el)return;const c=C[cycle];if(week>=c.weeks){const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;el.classList.remove('hidden');el.innerHTML=`🔄 <b>ÚLTIMA SEMANA · ${week}/${c.weeks}</b><br><span style="font-weight:500">Al terminar esta semana, podrás pasar a ${nextName}.</span>`; }else{el.classList.add('hidden');el.innerHTML=''}}
+function cycleNotice(){const el=document.getElementById('cycleAlert');if(!el)return;const c=C[cycle];if(week>=c.weeks){const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;el.classList.remove('hidden');el.innerHTML=`🔄 <b>ÚLTIMO DÍA DEL CICLO · ${week}/${c.weeks}</b><br>`; }else{el.classList.add('hidden');el.innerHTML=''}}
 function cycleCompletedNotice(){const c=C[cycle];if(week!==c.weeks)return;const key='cycleDone_'+cycle+'_'+week;if(localStorage.getItem(key))return;localStorage.setItem(key,'1');const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;if(confirm(`🔄 Ciclo completado\n\nHas terminado el ${c.name}.\n\nEl siguiente ciclo es ${nextName}.\n\n¿Quieres pasar ahora al siguiente ciclo?`))setCycle(next)}
 function restTime(){return Number(localStorage.getItem('rest_'+cycle)||C[cycle].rest)}
 function draftKey(){return DRAFT_KEY+'_'+today()}
@@ -215,7 +329,53 @@ function resetExerciseOrder(){
   render();
 }
 
+
+function completedCycleSessions(){
+  try{
+    const all=JSON.parse(localStorage.getItem('sessions')||'[]')||[];
+    return all.filter(s=>s.cycle===cycle).length;
+  }catch{return 0}
+}
+function recommendedWorkout(){
+  const order = Object.keys(C[cycle].workouts||{});
+  if(!order.length) return workout;
+  const done = completedCycleSessions();
+  return order[done % order.length] || order[0];
+}
+function cycleDay(){
+  return Math.min(completedCycleSessions()+1, C[cycle].days||completedCycleSessions()+1);
+}
+function renderRecommendation(){
+  const box=document.getElementById('nextRecommendation');
+  if(!box)return;
+  const rec=recommendedWorkout();
+  const day=cycleDay(), total=C[cycle].days||'?';
+  box.innerHTML=`<div class="card rec-card">
+    <div class="eyebrow">SIGUIENTE SESIÓN RECOMENDADA</div>
+    <div class="rec-title">${esc(rec)}</div>
+    <div class="small">Ciclo ${cycle} · Día ${day}/${total}</div>
+    <div class="row" style="margin-top:10px">
+      <button onclick="chooseRecommended()">Empezar ${esc(rec)}</button>
+      <button class="ghost" onclick="showWorkoutChoices()">Elegir otra sesión</button>
+    </div>
+  </div>`;
+}
+function chooseRecommended(){
+  workout=recommendedWorkout();
+  if(typeof render==='function') render();
+}
+function showWorkoutChoices(){
+  const choices=Object.keys(C[cycle].workouts||{});
+  const box=document.getElementById('nextRecommendation');
+  if(!box)return;
+  box.innerHTML=`<div class="card rec-card">
+    <div class="eyebrow">ELEGIR SESIÓN</div>
+    ${choices.map(w=>`<button class="ghost" style="margin:4px" onclick="workout=${JSON.stringify(w)};render()">${esc(w)}</button>`).join('')}
+  </div>`;
+}
+
 function render(){
+  renderRecommendation();
  const c=C[cycle];document.getElementById('cycleTitle').textContent=c.name;document.getElementById('week').textContent=`Semana ${week} de ${c.weeks}`;cycleNotice();
  ['strength','hypertrophy','power'].forEach(x=>document.getElementById('c'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===cycle));
  document.getElementById('workout').innerHTML=Object.keys(c.workouts).map(x=>`<option>${x}</option>`).join('');document.getElementById('workout').value=workout;
@@ -254,7 +414,7 @@ function suggestion(name,code,target,i){
  return ''
 }
 let iGlobal=0;
-const bodyweight_names=new Set(["Muscle-up","Pino / progresión","Flexiones explosivas","Muscle-up técnico","Remo australiano","Pike push-up elevada","Dominadas explosivas al pecho","Flexiones a pino","Fondos explosivos","Remo australiano explosivo","Fondos normales","Dominadas explosivas","Pike push-up","Flexiones en paralelas"]);
+const bodyweight_names=new Set(["Dominadas explosivas","Dominadas explosivas al pecho","Dominadas pronas","Dominadas supinas","Flexiones a pino","Flexiones a pino explosivas","Flexiones en paralelas","Flexiones explosivas","Fondos explosivos","Fondos normales","Muscle-up","Muscle-up técnico","Pike push-up","Pike push-up elevada","Pike push-up explosiva","Pino / progresión","Remo australiano","Remo australiano explosivo"]);
 function exerciseHTML(x,i){
  let [name,target,type,code]=x;
  const draft=getDraft();
@@ -286,7 +446,7 @@ function collect(){
 function saveSession(){let s=collect();if(!s.exercises.some(e=>e.done)){alert('Registra al menos una parte del entrenamiento.');return}data.push(s);localStorage.setItem(KEY,JSON.stringify(data));clearDraft();alert('Sesión guardada ✓');stats();cycleCompletedNotice()}
 function history(){
  document.getElementById('historyInfo').textContent=`${data.length} sesiones guardadas`;
- document.getElementById('historyList').innerHTML=data.slice().reverse().map((s,ri)=>`<div class="history"><b>${esc(s.routineName||s.program||'Entrenamiento')}</b> · ${fmt(s.date)}<div class="small">${esc(s.workout||'')} · Semana ${s.week||'—'}</div>${(s.exercises||[]).filter(e=>e.done).map(e=>`<span class="pill">${esc(e.name)}</span>`).join('')}<br><button class="ghost" style="margin-top:7px" onclick="del(${data.length-1-ri})">✕ Borrar</button></div>`).join('')||'<p class="muted">No hay sesiones.</p>'
+ document.getElementById('historyList').innerHTML=data.slice().reverse().map((s,ri)=>`<div class="history"><b>${esc(s.routineName||s.program||'Entrenamiento')}</b> · ${fmt(s.date)}${(s.exercises||[]).filter(e=>e.done).map(e=>`<span class="pill">${esc(e.name)}</span>`).join('')}<br><button class="ghost" style="margin-top:7px" onclick="del(${data.length-1-ri})">✕ Borrar</button></div>`).join('')||'<p class="muted">No hay sesiones.</p>'
 }
 function del(i){if(confirm('¿Borrar esta sesión?')){data.splice(i,1);localStorage.setItem(KEY,JSON.stringify(data));history();stats()}}
 function stats(){
