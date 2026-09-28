@@ -86,7 +86,7 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 </div></div>
 
 <script>
-const KEY='miRutinaDataV1', OLD_KEYS=['miRutinaData','rutinaData','workoutHistory','calistheniaData'];
+const KEY='miRutinaDataV1', DRAFT_KEY='draft_session', OLD_KEYS=['miRutinaData','rutinaData','workoutHistory','calistheniaData'];
 let data=[],cycle=localStorage.getItem('calCycle')||'strength',workout='Tirón A',week=Number(localStorage.getItem('calWeek')||1);
 let timerId=null,left=0,total=0,paused=false,audioCtx=null,autoTimer=localStorage.getItem('calAuto')!=='0';
 
@@ -126,42 +126,56 @@ function setCycle(c){cycle=c;week=1;workout=Object.keys(C[c].workouts)[0];localS
 function cycleNotice(){const el=document.getElementById('cycleAlert');if(!el)return;const c=C[cycle];if(week>=c.weeks){const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;el.classList.remove('hidden');el.innerHTML=`🔄 <b>ÚLTIMA SEMANA · ${week}/${c.weeks}</b><br><span style="font-weight:500">Al terminar esta semana, podrás pasar a ${nextName}.</span>`; }else{el.classList.add('hidden');el.innerHTML=''}}
 function cycleCompletedNotice(){const c=C[cycle];if(week!==c.weeks)return;const key='cycleDone_'+cycle+'_'+week;if(localStorage.getItem(key))return;localStorage.setItem(key,'1');const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;if(confirm(`🔄 Ciclo completado\n\nHas terminado el ${c.name}.\n\nEl siguiente ciclo es ${nextName}.\n\n¿Quieres pasar ahora al siguiente ciclo?`))setCycle(next)}
 function restTime(){return Number(localStorage.getItem('rest_'+cycle)||C[cycle].rest)}
+function draftKey(){return DRAFT_KEY+'_'+today()}
+function getDraft(){try{const d=JSON.parse(localStorage.getItem(draftKey())||'null');return d&&d.workout===workout&&d.program===cycle&&d.week===week?d:null}catch{return null}}
+function saveDraft(){try{localStorage.setItem(draftKey(),JSON.stringify(collectDraft()))}catch{}}
+function clearDraft(){localStorage.removeItem(draftKey())}
+function collectDraft(){
+ const ex=C[cycle].workouts[workout].map((x,i)=>{const [name,target,type]=x; if(type==='simple'||type==='accessory') return {name,target,type,done:!!document.getElementById('q'+i)?.classList.contains('done'),sets:[]};
+ let sets=Array.from({length:+((target.match(/^(\d+)/)||[0,3])[1])},(_,j)=>({weight:document.getElementById(`w${i}_${j}`)?.value||'',reps:document.getElementById(`r${i}_${j}`)?.value||'',done:!!document.getElementById(`s${i}_${j}`)?.classList.contains('done')}));
+ return {name,target,type,sets};});
+ return {date:today(),program:cycle,workout,week,exercises:ex};
+}
 function render(){
  const c=C[cycle];document.getElementById('cycleTitle').textContent=c.name;document.getElementById('week').textContent=`Semana ${week} de ${c.weeks}`;cycleNotice();
  ['strength','hypertrophy','power'].forEach(x=>document.getElementById('c'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===cycle));
  document.getElementById('workout').innerHTML=Object.keys(c.workouts).map(x=>`<option>${x}</option>`).join('');document.getElementById('workout').value=workout;
  document.getElementById('weekSel').innerHTML=Array.from({length:c.weeks},(_,i)=>`<option value="${i+1}">Semana ${i+1}</option>`).join('');document.getElementById('weekSel').value=week;
  document.getElementById('session').innerHTML=c.workouts[workout].map((x,i)=>exerciseHTML(x,i)).join('');
+ const d=getDraft();
+ if(d){ const old=document.getElementById('draftNotice'); if(old)old.remove(); const n=document.createElement('div'); n.id='draftNotice'; n.className='card'; n.style.borderColor='#1597ff'; n.innerHTML='<b>↻ Borrador recuperado</b><br><span class="small">Hemos recuperado el entrenamiento de hoy que estabas realizando.</span> <button class="ghost" style="margin-top:8px" onclick="clearDraft();render()">Descartar borrador</button>'; document.getElementById('session').prepend(n); }
 }
 function previous(name){
  for(let i=data.length-1;i>=0;i--){let e=(data[i].exercises||[]).find(x=>x.name===name);if(e)return e}return null
 }
 function targetMax(t){let m=String(t).match(/(\d+)\s*[–-]\s*(\d+)/);return m?+m[2]:null}
-function suggestion(name,code,target){
+function suggestion(name,code,target,i){
  const p=previous(name),n=nums(p);if(!p||!n.length||!['pullup','chinup','dip'].includes(code))return '';
  const max=targetMax(target), weights=n.map(x=>x.w).filter(Number.isFinite), last=weights.length?Math.max(...weights):0;
- if(max&&n.length>=2&&n.every(x=>x.r>=max)&&last!==undefined)return `<div class="suggest"><b>↗ Sugerencia para hoy: +${last+2.5} kg</b><br><span class="small">Completaste el máximo del rango anterior.</span><br><button class="primary" style="margin-top:7px" onclick="suggestLoad(${iGlobal},${last+2.5})">Usar +${last+2.5} kg</button></div>`;
+ if(max&&n.length>=2&&n.every(x=>x.r>=max)&&last!==undefined)return `<div class="suggest"><b>↗ Sugerencia para hoy: +${last+2.5} kg</b><br><span class="small">Completaste el máximo del rango anterior.</span><br><button class="primary" style="margin-top:7px" onclick="suggestLoad(${i},${last+2.5})">Usar +${last+2.5} kg</button></div>`;
  if(last)return `<div class="last"><b>Mantener +${last} kg</b><br><span class="small">Última sesión no completó todo el rango.</span></div>`;
  return ''
 }
 let iGlobal=0;
 function exerciseHTML(x,i){
- iGlobal=i;
  const [name,target,type,code]=x;
- if(type==='simple')return `<div class="simple"><b>${name==='Pierna'?'🦵':'▣'} ${name}</b><button id="q${i}" onclick="simpleDone(${i})">☐</button></div>`;
- if(type==='accessory')return `<div class="simple"><div><b>${esc(name)}</b><div class="small">${esc(target)}</div></div><button id="q${i}" onclick="simpleDone(${i})">☐</button></div>`;
+ const draft=getDraft();
+ const de=draft?.exercises?.[i];
+ if(type==='simple')return `<div class="simple"><b>${name==='Pierna'?'🦵':'▣'} ${name}</b><button id="q${i}" class="${de?.done?'done':''}" onclick="simpleDone(${i})">${de?.done?'✓':'☐'}</button></div>`;
+ if(type==='accessory')return `<div class="simple"><div><b>${esc(name)}</b><div class="small">${esc(target)}</div></div><button id="q${i}" class="${de?.done?'done':''}" onclick="simpleDone(${i})">${de?.done?'✓':'☐'}</button></div>`;
  const p=previous(name),pn=nums(p),prev=p?pn.map(z=>(Number.isFinite(z.w)?'+'+z.w+' kg ':'')+z.r).join(' / '):'Sin registro anterior';
  const count=(target.match(/^(\d+)/)||[0,3])[1];
+ const previousSets=pn.length?pn:[];
+ const sets=Array.from({length:+count},(_,j)=>{const ds=de?.sets?.[j], ps=previousSets[j]||previousSets[previousSets.length-1]; const w=ds?.weight!==undefined?ds.weight:(ps&&Number.isFinite(ps.w)?ps.w:''); const r=ds?.reps!==undefined?ds.reps:(ps&&Number.isFinite(ps.r)?ps.r:''); const done=!!ds?.done; return `<span class="setnum">${j+1}</span><input id="w${i}_${j}" type="number" step=".5" value="${esc(w)}" placeholder="kg" oninput="saveDraft()"><input id="r${i}_${j}" type="number" value="${esc(r)}" placeholder="reps" oninput="saveDraft()"><button class="checkset ${done?'done':''}" id="s${i}_${j}" onclick="finishSet(${i},${j},${+count})">✓</button>`}).join('');
  return `<div class="exercise main"><div class="row"><div><h3>${esc(name)}</h3><div class="small">${esc(target)}</div></div><span class="tag">PRINCIPAL</span></div>
- <div class="last"><b>Anterior</b> · ${esc(prev)} </div>${suggestion(name,code,target)}
- <div class="sets"><span class="hdr">#</span><span class="hdr">KG</span><span class="hdr">REPS</span><span></span>
- ${Array.from({length:+count},(_,j)=>`<span class="setnum">${j+1}</span><input id="w${i}_${j}" type="number" step=".5" placeholder="kg"><input id="r${i}_${j}" type="number" placeholder="reps"><button class="checkset" id="s${i}_${j}" onclick="finishSet(${i},${j},${+count})">✓</button>`).join('')}</div></div>`
+ <div class="last"><b>Anterior</b> · ${esc(prev)} </div>${suggestion(name,code,target,i)}
+ <div class="sets"><span class="hdr">#</span><span class="hdr">KG</span><span class="hdr">REPS</span><span></span>${sets}</div></div>`
 }
-function suggestLoad(i,w){document.querySelectorAll(`[id^="w${i}_"]`).forEach(x=>x.value=w)}
-function simpleDone(i){let b=document.getElementById('q'+i);b.classList.toggle('done');b.textContent=b.classList.contains('done')?'✓':'☐';if(autoTimer)startTimer(restTime(),'Siguiente bloque')}
+function suggestLoad(i,w){document.querySelectorAll(`[id^="w${i}_"]`).forEach(x=>x.value=w);saveDraft()}
+function simpleDone(i){let b=document.getElementById('q'+i);b.classList.toggle('done');b.textContent=b.classList.contains('done')?'✓':'☐';saveDraft();if(autoTimer)startTimer(restTime(),'Siguiente bloque')}
 function finishSet(i,j,count){
  const r=document.getElementById(`r${i}_${j}`);if(!r.value)return;
- document.getElementById(`s${i}_${j}`).classList.add('done');
+ document.getElementById(`s${i}_${j}`).classList.add('done');saveDraft();
  initAudio(); if(autoTimer && j<count-1)startTimer(restTime(),'Siguiente serie');
 }
 function collect(){
@@ -169,7 +183,7 @@ function collect(){
  let sets=Array.from(document.querySelectorAll(`[id^="w${i}_"]`)).filter(e=>e.id.startsWith('w'+i+'_')).map((_,j)=>({weight:document.getElementById(`w${i}_${j}`)?.value||'',reps:document.getElementById(`r${i}_${j}`)?.value||''}));return{name,target,type,sets,done:sets.some(s=>s.reps)} });
  return {id:Date.now(),date:today(),program:cycle,workout,week,exercises:ex,routineName:C[cycle].name}
 }
-function saveSession(){let s=collect();if(!s.exercises.some(e=>e.done)){alert('Registra al menos una parte del entrenamiento.');return}data.push(s);localStorage.setItem(KEY,JSON.stringify(data));alert('Sesión guardada ✓');stats();cycleCompletedNotice()}
+function saveSession(){let s=collect();if(!s.exercises.some(e=>e.done)){alert('Registra al menos una parte del entrenamiento.');return}data.push(s);localStorage.setItem(KEY,JSON.stringify(data));clearDraft();alert('Sesión guardada ✓');stats();cycleCompletedNotice()}
 function history(){
  document.getElementById('historyInfo').textContent=`${data.length} sesiones guardadas`;
  document.getElementById('historyList').innerHTML=data.slice().reverse().map((s,ri)=>`<div class="history"><b>${esc(s.routineName||s.program||'Entrenamiento')}</b> · ${fmt(s.date)}<div class="small">${esc(s.workout||'')} · Semana ${s.week||'—'}</div>${(s.exercises||[]).filter(e=>e.done).map(e=>`<span class="pill">${esc(e.name)}</span>`).join('')}<br><button class="ghost" style="margin-top:7px" onclick="del(${data.length-1-ri})">✕ Borrar</button></div>`).join('')||'<p class="muted">No hay sesiones.</p>'
@@ -207,6 +221,7 @@ function exportData(){let a=document.createElement('a');a.href=URL.createObjectU
 function importData(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);if(Array.isArray(x)){data=x;localStorage.setItem(KEY,JSON.stringify(data));history();stats();alert('Datos importados ✓')}}catch{alert('Archivo no válido')}};r.readAsText(f)}
 document.getElementById('workout').onchange=()=>{workout=document.getElementById('workout').value;render()};document.getElementById('weekSel').onchange=()=>{week=+document.getElementById('weekSel').value;localStorage.setItem('calWeek',week);render()};
 ['restStrength','restHyp','restPower'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{let c=id==='restStrength'?'strength':id==='restHyp'?'hypertrophy':'power';localStorage.setItem('rest_'+c,document.getElementById(id).value)}));
+window.addEventListener('beforeunload',()=>{try{if(document.getElementById('session') && collectDraft().exercises.some(e=>e.done||e.sets?.some(s=>s.reps||s.weight)))saveDraft()}catch{}});
 render();
 </script>
 </body>
