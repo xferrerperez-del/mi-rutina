@@ -113,6 +113,7 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 <script>
 const KEY='miRutinaDataV1', DRAFT_KEY='draft_session', OLD_KEYS=['miRutinaData','rutinaData','workoutHistory','calistheniaData'];
 let data=[],cycle=localStorage.getItem('calCycle')||'strength',workout='Tirón',week=Number(localStorage.getItem('calWeek')||1);
+let timerEndTime=null;
 let timerId=null,left=0,total=0,paused=false,audioCtx=null,autoTimer=localStorage.getItem('calAuto')!=='0';
 
 const C={
@@ -190,7 +191,7 @@ const C={
       ],
       'Empuje B':[
         ['Flexiones a pino','3 × 8-12','main','handstand_pushup'],
-        ['Fondos','3 × 8-12','main','dips'],
+        ['Fondos','3 × 8-12','main','dip'],
         ['Flexiones en paralelas','3 × 10-15','accessory','pushup_parallel'],
         ['Tríceps','3 × 10-15','accessory','triceps'],
         ['Elevaciones laterales','3 × 15-20','accessory','lateral'],
@@ -257,8 +258,8 @@ document.getElementById('today').textContent=new Date().toLocaleDateString('es-E
 function tab(id,b){document.querySelectorAll('main section').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');if(id==='stats')stats();if(id==='history')history()}
 
 function setCycle(c){cycle=c;week=1;workout=Object.keys(C[c].workouts)[0];localStorage.setItem('calCycle',c);localStorage.setItem('calWeek',week);render()}
-function cycleNotice(){const el=document.getElementById('cycleAlert');if(!el)return;const c=C[cycle];if(week>=c.weeks){const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;el.classList.remove('hidden');el.innerHTML=`🔄 <b>ÚLTIMO DÍA DEL CICLO · ${week}/${c.weeks}</b><br>`; }else{el.classList.add('hidden');el.innerHTML=''}}
-function cycleCompletedNotice(){const c=C[cycle];if(week!==c.weeks)return;const key='cycleDone_'+cycle+'_'+week;if(localStorage.getItem(key))return;localStorage.setItem(key,'1');const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;if(confirm(`🔄 Ciclo completado\n\nHas terminado el ${c.name}.\n\nEl siguiente ciclo es ${nextName}.\n\n¿Quieres pasar ahora al siguiente ciclo?`))setCycle(next)}
+function cycleNotice(){const el=document.getElementById('cycleAlert');if(!el)return;const c=C[cycle];if(week>=c.days){const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;el.classList.remove('hidden');el.innerHTML=`🔄 <b>ÚLTIMO DÍA DEL CICLO · ${week}/${c.days}</b><br>`; }else{el.classList.add('hidden');el.innerHTML=''}}
+function cycleCompletedNotice(){const c=C[cycle];if(week!==c.days)return;const key='cycleDone_'+cycle+'_'+week;if(localStorage.getItem(key))return;localStorage.setItem(key,'1');const next=cycle==='strength'?'hypertrophy':cycle==='hypertrophy'?'power':'strength';const nextName=C[next].name;if(confirm(`🔄 Ciclo completado\n\nHas terminado el ${c.name}.\n\nEl siguiente ciclo es ${nextName}.\n\n¿Quieres pasar ahora al siguiente ciclo?`))setCycle(next)}
 function restTime(){return Number(localStorage.getItem('rest_'+cycle)||C[cycle].rest)}
 function draftKey(){return DRAFT_KEY+'_'+today()}
 function getDraft(){try{const d=JSON.parse(localStorage.getItem(draftKey())||'null');return d&&d.workout===workout&&d.program===cycle&&d.week===week?d:null}catch{return null}}
@@ -376,10 +377,10 @@ function showWorkoutChoices(){
 
 function render(){
   renderRecommendation();
- const c=C[cycle];document.getElementById('cycleTitle').textContent=c.name;document.getElementById('week').textContent=`Semana ${week} de ${c.weeks}`;cycleNotice();
+ const c=C[cycle];document.getElementById('cycleTitle').textContent=c.name;document.getElementById('week').textContent=`Semana ${week} de ${c.days}`;cycleNotice();
  ['strength','hypertrophy','power'].forEach(x=>document.getElementById('c'+x[0].toUpperCase()+x.slice(1)).classList.toggle('active',x===cycle));
  document.getElementById('workout').innerHTML=Object.keys(c.workouts).map(x=>`<option>${x}</option>`).join('');document.getElementById('workout').value=workout;
- document.getElementById('weekSel').innerHTML=Array.from({length:c.weeks},(_,i)=>`<option value="${i+1}">Semana ${i+1}</option>`).join('');document.getElementById('weekSel').value=week;
+ document.getElementById('weekSel').innerHTML=Array.from({length:c.days},(_,i)=>`<option value="${i+1}">Semana ${i+1}</option>`).join('');document.getElementById('weekSel').value=week;
  document.getElementById('session').innerHTML=orderedExercises().map((x,i)=>exerciseHTML(x,i)).join(''); renderExerciseOrder();
  const d=getDraft();
  if(d){ const old=document.getElementById('draftNotice'); if(old)old.remove(); const n=document.createElement('div'); n.id='draftNotice'; n.className='card'; n.style.borderColor='#1597ff'; n.innerHTML='<b>↻ Borrador recuperado</b><br><span class="small">Hemos recuperado el entrenamiento de hoy que estabas realizando.</span> <button class="ghost" style="margin-top:8px" onclick="clearDraft();render()">Descartar borrador</button>'; document.getElementById('session').prepend(n); }
@@ -471,7 +472,23 @@ function playAlarm(){
  if(mode==='ring')setTimeout(()=>playBeep2(vol),190)
 }
 function playBeep2(vol){if(!audioCtx)return;let o=audioCtx.createOscillator(),g=audioCtx.createGain(),n=audioCtx.currentTime;o.frequency.value=1175;g.gain.setValueAtTime(.0001,n);g.gain.exponentialRampToValueAtTime(.25*vol,n+.02);g.gain.exponentialRampToValueAtTime(.0001,n+.3);o.connect(g).connect(audioCtx.destination);o.start(n);o.stop(n+.32)}
-function startTimer(sec,title){clearInterval(timerId);left=total=sec;paused=false;document.getElementById('timerTitle').textContent=title;document.getElementById('timer').classList.remove('hidden');paintTimer();timerId=setInterval(()=>{if(paused)return;left--;paintTimer();if(left<=0){clearInterval(timerId);left=0;paintTimer();playAlarm();}},1000)}
+function startTimer(sec){
+  clearInterval(timerId);
+  const endTime = Date.now() + sec * 1000;
+  timerEndTime = endTime;
+  left = sec;
+  updateTimerDisplay();
+  timerId = setInterval(() => {
+    left = Math.max(0, Math.round((endTime - Date.now()) / 1000));
+    updateTimerDisplay();
+    if (left <= 0) {
+      clearInterval(timerId);
+      timerId = null;
+      timerEndTime = null;
+      playRestAlarm();
+    }
+  }, 250);
+}
 function paintTimer(){let m=Math.floor(left/60),s=left%60;document.getElementById('timerNum').textContent=`${m}:${String(s).padStart(2,'0')}`;document.getElementById('timerSub').textContent=`de ${Math.floor(total/60)}:${String(total%60).padStart(2,'0')}`;document.getElementById('timerRing').style.setProperty('--pct',`${total?left/total*360:0}deg`)}
 function pauseTimer(){paused=!paused}
 function add30(){left+=30;total=Math.max(total,left);paintTimer()}
@@ -486,3 +503,11 @@ render();
 </script>
 </body>
 </html>
+<script>
+document.addEventListener('visibilitychange',()=>{
+  if(timerEndTime){
+    left=Math.max(0,Math.round((timerEndTime-Date.now())/1000));
+    if(typeof updateTimerDisplay==='function') updateTimerDisplay();
+  }
+});
+</script>
