@@ -72,10 +72,9 @@ label{display:block}.label{color:var(--muted);font-size:11px;margin-bottom:5px}
 .chartWrap svg{width:100%;height:220px;display:block;overflow:visible}
 .chartWrap .axis{stroke:#2a3d4d;stroke-width:1}
 .chartWrap .gridline{stroke:#1a2836;stroke-width:1;stroke-dasharray:3 4}
-.chartWrap .line{fill:none;stroke:var(--blue);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
-.chartWrap .dot{fill:#0b151e;stroke:var(--blue);stroke-width:2;cursor:pointer}
+.chartWrap .line{fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.chartWrap .dot{fill:#0b151e;stroke-width:2;cursor:pointer}
 .chartWrap .lbl{fill:var(--muted);font-size:9px}
-.chartWrap .val{fill:#cfe0ee;font-size:9px;font-weight:700}
 .chartEmpty{color:var(--muted);font-size:12px;text-align:center;padding:30px}
 .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:11px;color:var(--muted)}
 .legend .lg{display:inline-flex;align-items:center;gap:5px}
@@ -244,16 +243,6 @@ let autoTimer=localStorage.getItem('calAuto')!=='0';
 
 /* ============================================================
    PROGRAMACIÓN
-   Tipos:
-     'weighted' → kg + reps + check (solo 4 originales)
-     'reps'     → reps + check (sin kg)
-     'accessory'→ solo check
-     'simple'   → solo check
-   Si no se indica tipo de seguimiento, se deduce:
-     main sin code  → reps + check
-     main con code 'weighted' → kg + reps + check
-     main con code 'handstand' → reps + check (Pino)
-     accessory/simple → solo check
    ============================================================ */
 const C={
 strength:{name:'Ciclo 1 · Fuerza',sessions:24,rest:180,workouts:{
@@ -281,13 +270,6 @@ function fmt(d){return new Date(d+'T12:00:00').toLocaleDateString('es-ES',{day:'
 function today(){return new Date().toISOString().slice(0,10)}
 function nums(e){return (e?.sets||[]).map(s=>({w:parseFloat(String(s.weight).replace(',','.')),r:parseInt(s.reps)})).filter(x=>Number.isFinite(x.r))}
 function isWeighted(x){return x&&x[3]==='weighted'}
-function isHandstand(x){return x&&x[3]==='handstand'}
-function exerciseHasReps(x){
-  if(!x)return false;
-  if(x[2]==='accessory'||x[2]==='simple')return false;
-  return true; // main siempre tiene reps en esta versión
-}
-function exerciseHasKg(x){return isWeighted(x)}
 
 /* ============================================================
    DEDUPLICACIÓN
@@ -352,10 +334,6 @@ function dedupeSessions(arr){
   });
   return order.map(k=>map.get(k));
 }
-
-/* ============================================================
-   CARGA
-   ============================================================ */
 function load(){
   const sources=[];
   try{const raw=localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(Array.isArray(x))sources.push(...x);else if(x&&Array.isArray(x.sessions))sources.push(...x.sessions)}}catch{}
@@ -396,10 +374,13 @@ function loadCustomRoutines(){try{return JSON.parse(localStorage.getItem(ROUTINE
 function saveCustomRoutines(o){localStorage.setItem(ROUTINES_KEY,JSON.stringify(o))}
 function routineKey(){return cycle+'|'+workout}
 function currentExercises(){
+  if(!C[cycle])cycle='strength';
+  if(!ORDER.includes(workout))workout=ORDER[0];
   const all=loadCustomRoutines();
   const r=all[routineKey()];
   if(Array.isArray(r)&&r.length)return r;
-  return C[cycle].workouts[workout]||[];
+  const base=C[cycle].workouts[workout];
+  return Array.isArray(base)?base:[];
 }
 function saveCustomRoutine(arr){
   const all=loadCustomRoutines();
@@ -415,7 +396,7 @@ function getDraft(){try{const d=JSON.parse(localStorage.getItem(draftKey())||'nu
 function saveDraft(){
   try{
     const ex=currentExercises().map((x,i)=>{
-      const [name,target,type,code]=x;
+      const [name,target,type]=x;
       if(type==='simple'||type==='accessory'){
         return {name,target,type,done:!!document.getElementById('q'+i)?.classList.contains('done'),sets:[]};
       }
@@ -425,7 +406,7 @@ function saveDraft(){
         reps:document.getElementById(`r${i}_${j}`)?.value||'',
         done:!!document.getElementById(`s${i}_${j}`)?.classList.contains('done')
       }));
-      return {name,target,type,code,sets};
+      return {name,target,type,sets};
     });
     localStorage.setItem(draftKey(),JSON.stringify({date:today(),program:cycle,workout,exercises:ex}));
   }catch{}
@@ -445,6 +426,7 @@ function tab(id,b){
 }
 
 function setCycle(c){
+  if(!C[c])return;
   cycle=c;
   localStorage.setItem('calCycle',c);
   workout=nextWorkout();
@@ -452,6 +434,8 @@ function setCycle(c){
 }
 
 function render(){
+  if(!C[cycle])cycle='strength';
+  if(!ORDER.includes(workout))workout=nextWorkout();
   const c=C[cycle];
   document.getElementById('cycleTitle').textContent=c.name;
   const num=currentSessionNumber();
@@ -466,22 +450,33 @@ function render(){
 
   ['strength','hypertrophy','power'].forEach(x=>{
     const id='c'+x[0].toUpperCase()+x.slice(1);
-    document.getElementById(id).classList.toggle('active',x===cycle);
+    const el=document.getElementById(id);
+    if(el)el.classList.toggle('active',x===cycle);
   });
-  document.getElementById('workout').innerHTML=ORDER.map(x=>`<option>${x}</option>`).join('');
-  document.getElementById('workout').value=workout;
-  document.getElementById('session').innerHTML=currentExercises().map((x,i)=>exerciseHTML(x,i)).join('');
+
+  const wSel=document.getElementById('workout');
+  wSel.innerHTML=ORDER.map(x=>`<option>${x}</option>`).join('');
+  wSel.value=workout;
+
+  const exs=currentExercises();
+  const sessionEl=document.getElementById('session');
+  if(!exs.length){
+    sessionEl.innerHTML='<div class="card"><b>⚠️ No hay ejercicios para esta sesión.</b><div class="small" style="margin-top:6px">Prueba a restablecer la rutina en el bloque de abajo.</div></div>';
+  }else{
+    sessionEl.innerHTML=exs.map((x,i)=>exerciseHTML(x,i)).join('');
+  }
   renderExerciseOrder();
+
   const d=getDraft();
+  const old=document.getElementById('draftNotice');
+  if(old)old.remove();
   if(d){
-    const old=document.getElementById('draftNotice');
-    if(old)old.remove();
     const n=document.createElement('div');
     n.id='draftNotice';
     n.className='card';
     n.style.borderColor='#1597ff';
     n.innerHTML='<b>↻ Borrador recuperado</b><br><span class="small">Hemos recuperado el entrenamiento de hoy que estabas realizando.</span> <button class="ghost" style="margin-top:8px" onclick="clearDraft();render()">Descartar borrador</button>';
-    document.getElementById('session').prepend(n);
+    sessionEl.prepend(n);
   }
 }
 
@@ -489,9 +484,9 @@ function render(){
    HTML DE EJERCICIO
    ============================================================ */
 function exerciseHTML(x,i){
-  const [name,target,type,code]=x;
+  const [name,target,type]=x;
+  if(!name)return '';
   const weighted=isWeighted(x);
-  const hasReps=exerciseHasReps(x);
   const draft=getDraft();
   const de=draft?.exercises?.[i];
   const p=previous(name);
@@ -504,7 +499,6 @@ function exerciseHTML(x,i){
   if(type==='accessory'){
     return `<div class="simple"><div><b>${esc(name)}</b><div class="small">${esc(target)}</div></div><button id="q${i}" class="${de?.done?'done':''}" onclick="simpleDone(${i})">${de?.done?'✓':'☐'}</button></div>`;
   }
-  // Principal (con o sin kg, con reps)
   const count=+((target.match(/^(\d+)/)||[0,3])[1]);
   const prevSets=pn.length?pn:[];
   const sets=Array.from({length:count},(_,j)=>{
@@ -521,6 +515,14 @@ function exerciseHTML(x,i){
   <div class="sets ${weighted?'weighted':'repsonly'}"><span class="hdr">#</span>${weighted?'<span class="hdr">KG</span>':''}<span class="hdr">REPS</span><span></span>${sets}</div></div>`;
 }
 
+function previous(name){
+  for(let i=data.length-1;i>=0;i--){
+    const e=(data[i].exercises||[]).find(x=>x.name===name);
+    if(e)return e;
+  }
+  return null;
+}
+
 /* ============================================================
    ORDEN EJERCICIOS
    ============================================================ */
@@ -528,6 +530,7 @@ function renderExerciseOrder(){
   const box=document.getElementById('exerciseOrder');
   if(!box)return;
   const arr=currentExercises();
+  if(!arr.length){box.innerHTML='<div class="small">No hay ejercicios.</div>';return}
   box.innerHTML=arr.map((x,i)=>`<div class="order-item" draggable="true" data-name="${esc(x[0])}" data-idx="${i}">
     <span class="drag-handle">☰</span>
     <span class="order-name">${esc(x[0])}</span>
@@ -558,7 +561,7 @@ function applyOrderFromDOM(){
   const result=[];
   order.forEach(n=>{if(byName.has(n)){result.push(byName.get(n));byName.delete(n)}});
   byName.forEach(v=>result.push(v));
-  saveCustomRoutine(result);
+  if(result.length)saveCustomRoutine(result);
   render();
 }
 function moveExercise(i,dir){
@@ -573,6 +576,7 @@ function deleteExercise(i){
   if(!confirm('¿Eliminar este ejercicio de la rutina? No se borrará su historial.'))return;
   const arr=currentExercises().slice();
   arr.splice(i,1);
+  if(!arr.length){alert('No puedes dejar la rutina vacía.');return}
   saveCustomRoutine(arr);
   render();
 }
@@ -627,6 +631,7 @@ function finishSet(i,j,count){
   const r=document.getElementById(`r${i}_${j}`);
   if(!r||!r.value)return;
   const btn=document.getElementById(`s${i}_${j}`);
+  if(!btn)return;
   btn.classList.toggle('done');
   saveDraft();
   initAudio();
@@ -639,7 +644,7 @@ function restTime(){return Number(localStorage.getItem('rest_'+cycle)||C[cycle].
    ============================================================ */
 function collectSession(){
   const ex=currentExercises().map((x,i)=>{
-    const [name,target,type,code]=x;
+    const [name,target,type]=x;
     const weighted=isWeighted(x);
     if(type==='simple'||type==='accessory'){
       return {name,target,type,done:!!document.getElementById('q'+i)?.classList.contains('done'),sets:[]};
@@ -650,7 +655,7 @@ function collectSession(){
       reps:document.getElementById(`r${i}_${j}`)?.value||'',
       done:!!document.getElementById(`s${i}_${j}`)?.classList.contains('done')
     }));
-    return {name,target,type,code,sets,done:sets.some(s=>s.done)};
+    return {name,target,type,sets,done:sets.some(s=>s.done)};
   });
   return {id:Date.now(),date:today(),program:cycle,workout,routineName:C[cycle].name,exercises:ex};
 }
@@ -667,7 +672,7 @@ function saveSession(){
   clearDraft();
   alert('Sesión guardada ✓');
   workout=nextWorkout();
-  stats();
+  render();
 }
 
 /* ============================================================
@@ -691,12 +696,12 @@ const STAT_EXERCISES=[
   'Fondos','Fondos explosivos','Fondos normales',
   'Flexiones en paralelas','Flexiones explosivas'
 ];
+const STAT_WEIGHTED=new Set(['Dominadas lastradas','Dominadas supinas lastradas','Fondos lastrados','Dominadas pronas lastradas']);
 function metricApplies(name,m){
   const isKg=STAT_WEIGHTED.has(name);
   if(m==='kg'||m==='vol'||m==='e1rm')return isKg;
   return true;
 }
-const STAT_WEIGHTED=new Set(['Dominadas lastradas','Dominadas supinas lastradas','Fondos lastrados','Dominadas pronas lastradas']);
 
 function stats(){
   document.getElementById('statsMeta').textContent=`${data.length} sesiones en total`;
@@ -784,11 +789,9 @@ function drawExerciseChart(){
   const W=680,H=220,PADL=40,PADR=14,PADT=14,PADB=28;
   const n=rows.length;
   const xs=i=>PADL+(n===1?0:(i/(n-1))*(W-PADL-PADR));
-  const yMin=0;
   let yMax=1;
   active.forEach(a=>{rows.forEach(r=>{if(r[a.key]>yMax)yMax=r[a.key]})});
-  yMax=Math.ceil(yMax*1.1);
-  const ys=v=>H-PADB-((v-yMin)/(yMax-yMin))*(H-PADT-PADB);
+  yMax=Math.ceil(yMax*1.1)||1;
 
   const gridLines=[0,.25,.5,.75,1].map(f=>{
     const y=PADT+f*(H-PADT-PADB);
@@ -804,7 +807,7 @@ function drawExerciseChart(){
     const pts=rows.map((r,i)=>[xs(i),yLocal(r[a.key])]);
     const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
     paths+=`<path class="line" style="stroke:${a.color}" d="${d}"/>`;
-    paths+=pts.map((p,i)=>`<circle class="dot" cx="${p[0]}" cy="${p[1]}" r="3" style="stroke:${a.color}" data-tip="${esc(a.label)}: ${rows[i][a.key]}"></circle>`).join('');
+    paths+=pts.map(p=>`<circle class="dot" cx="${p[0]}" cy="${p[1]}" r="3" style="stroke:${a.color}"></circle>`).join('');
   });
 
   const xLabels=rows.map((r,i)=>{
@@ -821,11 +824,10 @@ function drawExerciseChart(){
   </svg>
   <div class="small" style="text-align:center;margin-top:4px;color:var(--muted)">Sesiones (1 = más antigua)</div>`;
 
-  if(metric==='all'||active.length>1){
+  if(active.length>1){
     legend.innerHTML=active.map(a=>`<span class="lg"><span class="sw" style="background:${a.color}"></span>${a.label}</span>`).join('');
   }
 
-  // Comparativa primera vs última
   const first=rows[0],last=rows[rows.length-1];
   const cmp=(k,label,unit)=>{
     const a=first[k],b=last[k];
@@ -996,25 +998,32 @@ function importData(e){
 /* ============================================================
    INIT
    ============================================================ */
-data=load();
-persist();
-document.getElementById('today').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
-if(!C[cycle])cycle='strength';
-workout=nextWorkout();
+try{
+  data=load();
+  persist();
+  document.getElementById('today').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+  if(!C[cycle])cycle='strength';
+  workout=nextWorkout();
 
-document.getElementById('workout').onchange=()=>{workout=document.getElementById('workout').value;render()};
-['restStrength','restHyp','restPower'].forEach(id=>{
-  const c={restStrength:'strength',restHyp:'hypertrophy',restPower:'power'}[id];
-  const v=localStorage.getItem('rest_'+c);
-  if(v)document.getElementById(id).value=v;
-  document.getElementById(id).addEventListener('change',()=>{
-    localStorage.setItem('rest_'+c,document.getElementById(id).value);
+  document.getElementById('workout').onchange=function(){
+    workout=document.getElementById('workout').value;
+    render();
+  };
+  ['restStrength','restHyp','restPower'].forEach(function(id){
+    var c={restStrength:'strength',restHyp:'hypertrophy',restPower:'power'}[id];
+    var v=localStorage.getItem('rest_'+c);
+    if(v)document.getElementById(id).value=v;
+    document.getElementById(id).addEventListener('change',function(){
+      localStorage.setItem('rest_'+c,document.getElementById(id).value);
+    });
   });
-});
-document.getElementById('autoSwitch').classList.toggle('on',autoTimer);
-window.addEventListener('beforeunload',()=>{try{saveDraft()}catch{}});
-
-render();
+  document.getElementById('autoSwitch').classList.toggle('on',autoTimer);
+  window.addEventListener('beforeunload',function(){try{saveDraft()}catch(e){}});
+  render();
+}catch(e){
+  console.error('Error al iniciar:',e);
+  document.getElementById('session').innerHTML='<div class="card"><b>⚠️ Error al iniciar la app</b><div class="small">'+esc(e.message)+'</div></div>';
+}
 </script>
 </body>
 </html>
