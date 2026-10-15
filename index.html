@@ -868,4 +868,153 @@ function drawPRs(){
   const prs=[];
   STAT_EXERCISES.forEach(name=>{
     let best=null;
-    data.forEach
+    data.forEach(s=>{
+      const m=sessionMetrics(s,name);
+      if(!m||m.reps<=0)return;
+      const isKg=STAT_WEIGHTED.has(name);
+      const val=isKg?m.kgMax:m.reps;
+      const unit=isKg?'kg':'reps';
+      if(val>0&&(!best||val>best.val))best={val,unit,date:s.date,workout:s.workout};
+    });
+    if(best)prs.push({name,...best});
+  });
+  if(!prs.length){wrap.innerHTML='<p class="muted">Aún no hay marcas registradas.</p>';return}
+  prs.sort((a,b)=>b.val-a.val);
+  wrap.innerHTML=prs.map(p=>`<div class="prRow"><div><div class="name">${esc(p.name)}</div><div class="meta">${esc(p.workout||'')} · ${fmt(p.date)}</div></div><div class="pr">${p.val} ${p.unit}</div></div>`).join('');
+}
+
+/* ============================================================
+   AJUSTES / TIMER / EXPORT-IMPORT
+   ============================================================ */
+function toggleAuto(){
+  autoTimer=!autoTimer;
+  localStorage.setItem('calAuto',autoTimer?'1':'0');
+  document.getElementById('autoSwitch').classList.toggle('on',autoTimer);
+}
+function initAudio(){try{audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume()}catch{}}
+function testSound(){initAudio();playAlarm()}
+function playAlarm(){
+  const mode=document.getElementById('sound').value,vol=Number(document.getElementById('volume').value);
+  if(mode==='vibration'){navigator.vibrate?.([250,120,250,120,350]);return}
+  if(mode==='none')return;
+  if(!audioCtx)return;
+  const now=audioCtx.currentTime,osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
+  osc.type='sine';
+  osc.frequency.setValueAtTime(mode==='ring'?880:660,now);
+  if(mode==='ring')osc.frequency.exponentialRampToValueAtTime(1175,now+.16);
+  gain.gain.setValueAtTime(.0001,now);
+  gain.gain.exponentialRampToValueAtTime(.35*vol,now+.02);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+(mode==='long'?.75:.28));
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now+(mode==='long'?.8:.35));
+  if(mode==='ring')setTimeout(()=>playBeep2(vol),190);
+}
+function playBeep2(vol){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(),g=audioCtx.createGain(),n=audioCtx.currentTime;
+  o.frequency.value=1175;
+  g.gain.setValueAtTime(.0001,n);
+  g.gain.exponentialRampToValueAtTime(.25*vol,n+.02);
+  g.gain.exponentialRampToValueAtTime(.0001,n+.3);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(n);o.stop(n+.32);
+}
+function startTimer(sec,title){
+  clearInterval(timerId);
+  left=total=sec;paused=false;
+  document.getElementById('timerTitle').textContent=title;
+  document.getElementById('timer').classList.remove('hidden');
+  paintTimer();
+  timerId=setInterval(()=>{
+    if(paused)return;
+    left--;
+    paintTimer();
+    if(left<=0){clearInterval(timerId);left=0;paintTimer();playAlarm()}
+  },1000);
+}
+function paintTimer(){
+  const m=Math.floor(left/60),s=left%60;
+  document.getElementById('timerNum').textContent=`${m}:${String(s).padStart(2,'0')}`;
+  document.getElementById('timerSub').textContent=`de ${Math.floor(total/60)}:${String(total%60).padStart(2,'0')}`;
+  document.getElementById('timerRing').style.setProperty('--pct',`${total?left/total*360:0}deg`);
+}
+function pauseTimer(){paused=!paused}
+function add30(){left+=30;total=Math.max(total,left);paintTimer()}
+function skipTimer(){clearInterval(timerId);closeTimer()}
+function closeTimer(){clearInterval(timerId);document.getElementById('timer').classList.add('hidden')}
+
+function exportData(){
+  const payload={
+    version:3,
+    exportedAt:new Date().toISOString(),
+    sessions:data,
+    routines:loadCustomRoutines(),
+    cycle
+  };
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  a.download='calisthenia-backup.json';
+  a.click();
+}
+function importData(e){
+  const f=e.target.files[0];
+  if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const x=JSON.parse(r.result);
+      let incoming=[];
+      if(Array.isArray(x))incoming=x;
+      else if(x&&Array.isArray(x.sessions))incoming=x.sessions;
+      else throw new Error('Formato no válido');
+      incoming=incoming.map(normalizeSession).filter(Boolean);
+      if(!incoming.length){alert('El archivo no contiene sesiones válidas.');return}
+      localStorage.setItem(BACKUP_KEY,JSON.stringify({at:new Date().toISOString(),sessions:data}));
+      const mode=confirm(`Se han encontrado ${incoming.length} sesiones.\n\nAceptar = FUSIONAR con las actuales.\nCancelar = REEMPLAZAR el historial actual.`);
+      if(mode)data=dedupeSessions([...data,...incoming]);
+      else{
+        if(!confirm('¿Seguro que quieres REEMPLAZAR todo el historial? Se ha guardado una copia de seguridad.'))return;
+        data=dedupeSessions(incoming);
+      }
+      if(x&&x.routines&&typeof x.routines==='object'){
+        if(confirm('¿Importar también las rutinas personalizadas?'))saveCustomRoutines(x.routines);
+      }
+      if(x&&x.cycle&&C[x.cycle]){cycle=x.cycle;localStorage.setItem('calCycle',cycle)}
+      persist();
+      workout=nextWorkout();
+      render();
+      stats();
+      history();
+      alert('Importación completada ✓');
+    }catch(err){alert('Archivo no válido: '+err.message)}
+  };
+  r.readAsText(f);
+  e.target.value='';
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+data=load();
+persist();
+document.getElementById('today').textContent=new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+if(!C[cycle])cycle='strength';
+workout=nextWorkout();
+
+document.getElementById('workout').onchange=()=>{workout=document.getElementById('workout').value;render()};
+['restStrength','restHyp','restPower'].forEach(id=>{
+  const c={restStrength:'strength',restHyp:'hypertrophy',restPower:'power'}[id];
+  const v=localStorage.getItem('rest_'+c);
+  if(v)document.getElementById(id).value=v;
+  document.getElementById(id).addEventListener('change',()=>{
+    localStorage.setItem('rest_'+c,document.getElementById(id).value);
+  });
+});
+document.getElementById('autoSwitch').classList.toggle('on',autoTimer);
+window.addEventListener('beforeunload',()=>{try{saveDraft()}catch{}});
+
+render();
+</script>
+</body>
+</html>
